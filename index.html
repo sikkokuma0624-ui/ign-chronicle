@@ -985,6 +985,8 @@ function renderStartContinue(){
  var h=hasSave()?'<button class="primary" style="width:100%;margin-bottom:10px;" onclick="continueGame()">端末データで続きから</button><button style="width:100%;margin-bottom:10px;" onclick="resetSave()">最初からやり直す（端末データ削除）</button>':'';
  if(cloudRemoteSave&&cloudRemoteSave.save_data)h+='<button style="width:100%;margin-bottom:10px;border-color:#8f6bff;" onclick="cloudLoadFromStart()">クラウドから復元<br><span class="small">'+cloudTimeText(cloudRemoteSave.updated_at)+'</span></button>';
  h+='<div class="small" style="margin-bottom:14px;">クラウド：'+cloudStatus+'</div>';
+ if(cloudIsAnonymous())h+='<div style="margin-top:14px;padding:16px;border:1px solid #30303f;border-radius:14px;background:#12121a;text-align:left;"><strong>登録済みの方・別端末から引き継ぐ</strong><div class="small" style="margin:6px 0 10px;">登録済みメールアドレスへログインリンクを送ります。メール内のリンクを押すとクラウドセーブを復元できます。</div><input id="startLoginEmail" type="email" autocomplete="email" placeholder="登録済みメールアドレス" style="width:100%;font-size:16px;padding:12px;border-radius:10px;border:1px solid #444;background:#0d0d13;color:#fff;margin:0 0 8px;"><button style="width:100%;" onclick="sendCloudLoginLink(\'startLoginEmail\')">ログインリンクを送る</button></div>';
+ else h+='<div class="small" style="margin:8px 0 14px;color:#8fe3ff;">メール連携済み。クラウドセーブを利用できます。</div>';
  a.innerHTML=h;
 }
 async function cloudLoadFromStart(){
@@ -1004,8 +1006,8 @@ async function linkCloudEmail(){
   showMessage('確認メールを送信しました','メール内の確認リンクを押してください。<br><br>確認後にゲームへ戻ると、現在のセーブデータが同じアカウントのまま引き継がれます。');
  }catch(e){logError(e);showMessage('メール連携失敗','入力したメールが既に使用されているか、送信回数の上限に達した可能性があります。既存アカウントの場合は「ログインリンクを送る」を使用してください。');}
 }
-async function sendCloudLoginLink(){
- var email=accountInput('loginEmail');if(!validEmail(email)){showMessage('入力確認','正しいメールアドレスを入力してください。');return;}
+async function sendCloudLoginLink(inputId){
+ var email=accountInput(inputId||'loginEmail');if(!validEmail(email)){showMessage('入力確認','正しいメールアドレスを入力してください。');return;}
  if(!cloudReady&&!(await cloudInit())){showMessage('接続失敗','Supabaseへ接続できませんでした。');return;}
  try{
   var res=await cloudClient.auth.signInWithOtp({email:email,options:{emailRedirectTo:APP_URL,shouldCreateUser:false}});if(res.error)throw res.error;
