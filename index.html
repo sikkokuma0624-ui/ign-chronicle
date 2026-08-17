@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>異能ゲート・クロニクル v27</title>
+<title>異能ゲート・クロニクル v28</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b0b10;color:#e8e6f0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;line-height:1.5}
 #app{max-width:760px;margin:0 auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom))}
@@ -44,7 +44,7 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 <body>
 <div id="app">
 <section id="startScreen">
-<h1>異能ゲート・クロニクル <span class="small">v27</span></h1>
+<h1>異能ゲート・クロニクル <span class="small">v28</span></h1>
 <div class="card"><h2>キャラクター作成</h2>
 <p class="small">名前を入力し、10種の初期異能から1つ選択してください。世界には、条件を満たした者だけが発見できる5つの隠し異能も存在します。</p>
 <input id="playerNameInput" type="text" maxlength="12" placeholder="名前を入力" style="width:100%;font-size:18px;padding:12px;border-radius:12px;border:1px solid #444;background:#0d0d13;color:#fff;margin-bottom:6px;"></div>
@@ -102,6 +102,7 @@ var ENHANCE={max:10,perPlus:0.08,baseCost:300,scale:1.55};
 var POTION={name:'治癒薬',price:120,healPct:40,desc:'最大HPの40%を回復する。戦闘中は1戦につき1個まで（行動を1回消費）。探索中は何個でも使える。'};
 var REQ_BASE={F:1,E:8,D:15,C:25,B:35,A:45,S:50,SS:65,SSS:80,EX:100};
 var SAVE_KEY='ign_save_v1';
+var BACKUP_KEY='ign_save_backups_v1';
 var CLOUD_GAME_ID='inou_chronicle';
 var SUPABASE_URL='https://ybbolpaerkhozzxlsvag.supabase.co';
 var SUPABASE_PUBLISHABLE_KEY='sb_publishable_xJ2RGNNCbWGBB0kd2LO2Ag_LJuQw0VB';
@@ -918,6 +919,12 @@ function getSynergies(){return{burnCrit:hasTag('burn')&&hasTag('crit'),weakenMar
 burnAmpSyn:hasTag('burn')&&hasTag('burnamp'),multiCrit:hasTag('multi')&&hasTag('crit'),resBurst:hasTag('res')&&hasTag('burst')};}
 function cloudTimeText(v){if(!v)return'未保存';try{return new Date(v).toLocaleString('ja-JP');}catch(e){return String(v);}}
 function cloudEsc(v){return String(v||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function cloudRevisionSame(a,b){if(!a||!b)return false;var x=new Date(a).getTime(),y=new Date(b).getTime();return isFinite(x)&&isFinite(y)&&x===y;}
+function saveSummary(s){if(!s)return'データなし';return cloudEsc((s.name||'名称不明')+'／Lv'+(s.level||1)+'／転生'+(s.rebirth||0)+'／ランク'+(s.rank||'-'));}
+function recoveryBackups(){try{var a=JSON.parse(localStorage.getItem(BACKUP_KEY)||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}}
+function storeRecoveryBackup(data,label){if(!data)return;try{var a=recoveryBackups();a.unshift({savedAt:new Date().toISOString(),label:label||'自動バックアップ',data:JSON.parse(JSON.stringify(data))});a=a.slice(0,3);localStorage.setItem(BACKUP_KEY,JSON.stringify(a));}catch(e){logError(e);}}
+function latestRecoveryBackup(){var a=recoveryBackups();return a.length?a[0]:null;}
+function restoreRecoveryBackup(){var b=latestRecoveryBackup();if(!b){showMessage('バックアップなし','復元できるバックアップはありません。');return;}if(!safeConfirm('現在の端末データを「'+b.label+'」で置き換えますか？'))return;if(state)storeRecoveryBackup(state,'バックアップ復元前');try{localStorage.setItem(SAVE_KEY,JSON.stringify(b.data));location.reload();}catch(e){logError(e);showMessage('復元失敗','バックアップを端末へ復元できませんでした。');}}
 function cloudSetStatus(v){cloudStatus=v;var el=document.getElementById('cloudStatusText');if(el)el.textContent=v;}
 function cloudIsAnonymous(){return!cloudUser||cloudUser.is_anonymous===true;}
 function cloudAccountText(){if(!cloudUser)return'未接続';if(cloudIsAnonymous())return'ゲスト利用中';return cloudUser.email?('連携済み：'+cloudEsc(cloudUser.email)):'メール連携済み';}
@@ -953,6 +960,9 @@ async function cloudFetchRemote(showError){
   cloudRemoteSave=res.data||null;
   cloudRemoteChecked=true;
   if(cloudRemoteSave&&cloudRemoteSave.updated_at)cloudLastSavedAt=cloudRemoteSave.updated_at;
+  if(state&&cloudRemoteSave&&cloudRemoteSave.save_data&&cloudRemoteSave.save_data.playerId===state.playerId&&!state._cloudUpdatedAt){
+   state._cloudUpdatedAt=cloudRemoteSave.updated_at;try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));}catch(ignore){}
+  }
   renderCloudStartButton();
   return cloudRemoteSave;
  }catch(e){logError(e);if(showError)showMessage('クラウド読込失敗','通信状態を確認して、もう一度お試しください。');return null;}
@@ -964,21 +974,37 @@ function cloudOwnerCanSave(){
  if(!cloudRemoteSave||(cloudRemoteSave.save_data&&cloudRemoteSave.save_data.playerId===state.playerId)){state._cloudOwnerId=cloudUser.id;return true;}
  return false;
 }
-function showCloudConflict(){showModal('<h3>セーブデータの確認が必要です</h3><p>この端末のデータと、ログイン中のクラウドデータは別の記録です。自動上書きを停止しました。</p><button class="primary" style="width:100%;margin-bottom:8px;" onclick="cloudLoadInGame()">クラウドデータを復元</button><button class="danger" style="width:100%;" onclick="cloudForceOverwrite()">この端末データでクラウドを上書き</button><button style="width:100%;margin-top:8px;" onclick="closeModal()">後で決める</button>');}
-async function cloudSaveNow(showResult){
+function cloudConflictReason(remote){
+ if(!remote||!remote.save_data)return'';
+ if(remote.save_data.playerId!==state.playerId)return'別のキャラクターデータです。';
+ if(state._cloudUpdatedAt&&!cloudRevisionSame(state._cloudUpdatedAt,remote.updated_at))return'別の端末で更新された新しいデータがあります。';
+ return'';
+}
+function showCloudConflict(){var r=cloudRemoteSave||{},localText=saveSummary(state),remoteText=saveSummary(r.save_data);showModal('<h3>セーブ競合を検出しました</h3><p>自動上書きを停止しました。内容を確認して、残すデータを選んでください。</p><div class="card"><strong>この端末</strong><div class="small">'+localText+'</div><div class="small">基準：'+cloudTimeText(state&&state._cloudUpdatedAt)+'</div></div><div class="card"><strong>クラウド</strong><div class="small">'+remoteText+'</div><div class="small">更新：'+cloudTimeText(r.updated_at)+'</div></div><button class="primary" style="width:100%;margin-bottom:8px;" onclick="cloudLoadInGame()">クラウドデータを復元</button><button class="danger" style="width:100%;" onclick="cloudForceOverwrite()">この端末データでクラウドを上書き</button><button style="width:100%;margin-top:8px;" onclick="closeModal()">後で決める</button>');}
+async function cloudSaveNow(showResult,force){
  if(!state)return false;
  if(!cloudReady&&!(await cloudInit())){if(showResult)showMessage('クラウド保存失敗','接続できませんでした。端末内には保存済みです。');return false;}
  if(!cloudOwnerCanSave()){cloudSetStatus('自動保存停止（データ選択が必要）');if(showResult)showCloudConflict();return false;}
+ var previousRevision=state._cloudUpdatedAt;
  try{
   cloudSetStatus('保存中…');
+  var check=await cloudClient.from('game_saves').select('save_data,version,updated_at').eq('user_id',cloudUser.id).eq('game_id',CLOUD_GAME_ID).maybeSingle();
+  if(check.error)throw check.error;
+  var latest=check.data||null;cloudRemoteSave=latest;cloudRemoteChecked=true;
+  var reason=cloudConflictReason(latest);
+  if(reason&&!force){cloudSetStatus('自動保存停止（'+reason+'）');if(showResult)showCloudConflict();return false;}
+  if(latest&&!state._cloudUpdatedAt&&latest.save_data&&latest.save_data.playerId===state.playerId)state._cloudUpdatedAt=latest.updated_at;
   var now=new Date().toISOString();
-  var res=await cloudClient.from('game_saves').upsert({user_id:cloudUser.id,game_id:CLOUD_GAME_ID,save_data:cloudPayload(),version:state.dataVersion||1,updated_at:now},{onConflict:'user_id,game_id'});
+  state._cloudUpdatedAt=now;state._cloudOwnerId=cloudUser.id;
+  var payload=cloudPayload();
+  var res=await cloudClient.from('game_saves').upsert({user_id:cloudUser.id,game_id:CLOUD_GAME_ID,save_data:payload,version:state.dataVersion||1,updated_at:now},{onConflict:'user_id,game_id'}).select('save_data,version,updated_at').single();
   if(res.error)throw res.error;
-  cloudLastSavedAt=now;cloudRemoteSave={save_data:cloudPayload(),version:state.dataVersion||1,updated_at:now};
-  cloudSetStatus('保存済み '+cloudTimeText(now));
+  var savedAt=(res.data&&res.data.updated_at)||now;state._cloudUpdatedAt=savedAt;try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));}catch(ignore){}
+  cloudLastSavedAt=savedAt;cloudRemoteSave=res.data||{save_data:payload,version:state.dataVersion||1,updated_at:savedAt};
+  cloudSetStatus('保存済み '+cloudTimeText(savedAt));
   if(showResult)showMessage('クラウド保存完了','端末内とクラウドの両方へ保存しました。');
   return true;
- }catch(e){logError(e);cloudSetStatus('保存失敗（端末内保存は有効）');if(showResult)showMessage('クラウド保存失敗','端末内には保存済みです。通信状態を確認して、もう一度お試しください。');return false;}
+ }catch(e){state._cloudUpdatedAt=previousRevision;logError(e);cloudSetStatus('保存失敗（端末内保存は有効）');if(showResult)showMessage('クラウド保存失敗','端末内には保存済みです。通信状態を確認して、もう一度お試しください。');return false;}
 }
 function scheduleCloudSave(){if(!cloudReady||!state||!cloudRemoteChecked)return;if(!cloudOwnerCanSave()){cloudSetStatus('自動保存停止（データ選択が必要）');return;}clearTimeout(cloudTimer);cloudTimer=setTimeout(function(){cloudSaveNow(false);},2500);}
 function saveGame(){if(!state)return;try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));scheduleCloudSave();}catch(e){logError(e);}}
@@ -998,7 +1024,7 @@ function renderStartContinue(){
 async function cloudLoadFromStart(){
  var remote=cloudRemoteSave||(await cloudFetchRemote(true));if(!remote||!remote.save_data)return;
  if(hasSave()&&!safeConfirm('端末内データをクラウドデータで上書きしますか？'))return;
- try{var restored=JSON.parse(JSON.stringify(remote.save_data));restored._cloudOwnerId=cloudUser.id;localStorage.setItem(SAVE_KEY,JSON.stringify(restored));continueGame();}catch(e){logError(e);showMessage('復元失敗','クラウドデータを端末へ保存できませんでした。');}
+ try{var old=loadGame();if(old)storeRecoveryBackup(old,'クラウド復元前の端末データ');var restored=JSON.parse(JSON.stringify(remote.save_data));restored._cloudOwnerId=cloudUser.id;restored._cloudUpdatedAt=remote.updated_at;localStorage.setItem(SAVE_KEY,JSON.stringify(restored));continueGame();}catch(e){logError(e);showMessage('復元失敗','クラウドデータを端末へ保存できませんでした。');}
 }
 function accountInput(id){var el=document.getElementById(id);return el?el.value.trim():'';}
 function validEmail(v){return/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);}
@@ -1022,7 +1048,8 @@ async function sendCloudLoginLink(inputId){
 }
 async function cloudForceOverwrite(){
  if(!state||!cloudUser)return;if(!safeConfirm('クラウドの既存データを、この端末データで上書きしますか？'))return;
- state._cloudOwnerId=cloudUser.id;closeModal();await cloudSaveNow(true);
+ if(cloudRemoteSave&&cloudRemoteSave.save_data)storeRecoveryBackup(cloudRemoteSave.save_data,'端末データで上書きする前のクラウドデータ');
+ state._cloudOwnerId=cloudUser.id;state._cloudUpdatedAt=cloudRemoteSave&&cloudRemoteSave.updated_at;closeModal();await cloudSaveNow(true,true);
 }
 function resetDailyOn(s){var t=DAY();
 if(!s.daily||s.daily.date!==t)s.daily={date:t,boss:false,ad:0,passStamina:false,missions:{wins:0,bosses:0,pvp:0,ads:0},claimed:{}};
@@ -1045,7 +1072,7 @@ s.inventory=s.inventory||[];s.equipment=s.equipment||[null,null];
 if((s.dataVersion||0)<24){var rarityMap=[0,2,4,6];
 s.inventory.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});
 s.equipment.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});}
-s.dataVersion=27;
+s.dataVersion=28;
 s.currentGateIndex=clamp(s.currentGateIndex||0,0,GATES.length-1);s.pendingSkills=s.pendingSkills||[];s.battle=null;s.auto=false;s.debugGates=s.debugGates||false;
 s.stamina=s.stamina==null?100:s.stamina;s.staminaTs=s.staminaTs||serverTime();s.arenaPts=s.arenaPts||0;s.playerId=s.playerId||makeId();
 s.learned=s.learned||{first:[],second:[],integrated:[]};s.skillDone=s.skillDone||{first:[],second:[],integrated:[]};
@@ -1089,7 +1116,7 @@ if(!name){showMessage('名前未入力','キャラクター名を入力してく
 if(!selectedAbility){showMessage('異能未選択','リストから初期異能を1つ選択してください。');return;}
 if(hasSave()&&!safeConfirm('既存のセーブデータを上書きして新しく始めますか？'))return;
 tierCache={};
-state={dataVersion:27,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
+state={dataVersion:28,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
 alloc:{str:0,vit:0,def:0,agi:0,pow:0},currentGateIndex:0,stamina:100,staminaTs:serverTime(),hpTs:serverTime(),arenaPts:0,playerId:makeId(),auto:false,debugGates:false,
 learned:{first:[],second:[],integrated:[]},skillDone:{first:[],second:[],integrated:[]},
 inventory:[],equipment:[null,null,null],tut:{battles:0,gotItem:false,guideDone:false},frags:{},carriedSkills:[],abilityHistory:[],abilityMastery:{},abilityAcquired:{},titles:[],activeTitle:null,gold:CONFIG.START_GOLD,potions:CONFIG.START_POTIONS,iap:{noAds:false,passUntil:0},gateProgress:{},absorbed:[],pendingSkills:[],battle:null,bots:null,pvpTarget:null,unlockedHidden:[],hiddenNotices:[],storySeen:{},storyNotices:[],totalWins:0};
@@ -1660,7 +1687,7 @@ var rows=[{key:'str',label:'腕力',note:'1pt 攻撃+2',val:a.str},{key:'vit',la
 var h='<div class="card"><h3 style="margin-top:0;">ステータス割り振り</h3><div style="font-size:20px;font-weight:800;color:#ffd76b;">残りポイント：'+state.statPoints+'</div><div class="small">レベルアップごとに5ポイント獲得。</div></div>'+
 rows.map(function(r){return '<div class="card" style="display:flex;justify-content:space-between;align-items:center;"><div><strong>'+r.label+'</strong> <span class="small">（'+r.note+'）</span><div class="small">割り振り：'+r.val+'</div></div><button onclick="allocStat(\''+r.key+'\')" '+(state.statPoints<=0?'disabled':'')+'>＋</button></div>';}).join('')+
 '<div class="card"><h3 style="margin-top:0;">現在ステータス</h3><div class="stat-line"><span>最大HP '+st.hp+'</span><span>攻撃 '+st.atk+'</span><span>防御 '+st.def+'</span></div><div class="stat-line"><span>会心 '+fmtPct(st.crit)+'</span><span>回避 '+fmtPct(st.dodge)+'</span><span>命中 '+fmtPct(st.hit)+'</span><span>速度 '+st.speed+'</span></div><div class="stat-line"><span>異能威力 '+st.abilityPower+'%</span><span>吸収 '+fmtPct(st.lifesteal)+'</span><span>追撃 '+fmtPct(st.follow)+'</span><span>防御時回復 '+st.defHeal+'</span></div><div class="stat-line"><span>'+resName()+'上限 '+resMaxNow()+'</span><span>継続ダメージ '+dotName()+'</span></div><div class="small">転生ボーナス：+'+Math.round(state.rebirth*CONFIG.REINCARNATION_BONUS*100)+'%</div></div>'+
-'<div class="card"><h3 style="margin-top:0;">セーブ</h3><div class="small">通常は端末内へ即時保存し、接続時はクラウドへ自動保存します。</div><div id="cloudStatusText" class="small" style="margin-top:6px;color:#8fe3ff;">'+cloudStatus+'</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"><button onclick="serverSave()">今すぐクラウド保存</button><button onclick="cloudLoadInGame()">クラウドから復元</button></div></div>'+renderAccountCardHtml();
+'<div class="card"><h3 style="margin-top:0;">セーブ</h3><div class="small">通常は端末内へ即時保存し、接続時はクラウドへ自動保存します。同じセーブが別端末で更新された場合は自動上書きを停止します。</div><div id="cloudStatusText" class="small" style="margin-top:6px;color:#8fe3ff;">'+cloudStatus+'</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"><button onclick="serverSave()">今すぐクラウド保存</button><button onclick="cloudLoadInGame()">クラウドから復元</button>'+(latestRecoveryBackup()?'<button onclick="restoreRecoveryBackup()">緊急バックアップから復元</button>':'')+'</div>'+(latestRecoveryBackup()?'<div class="small" style="margin-top:8px;">最新バックアップ：'+cloudEsc(latestRecoveryBackup().label)+'／'+cloudTimeText(latestRecoveryBackup().savedAt)+'</div>':'')+'</div>'+renderAccountCardHtml();
 if(DEBUG_MODE)h+='<div class="card dbg"><h3 style="margin-top:0;">デバッグ（DEBUG_MODE）</h3>'+
 '<button onclick="dbgLv()">Lv+1</button> <button onclick="dbgExp()">EXP+500</button> <button onclick="dbgStFull()">スタミナ全回復</button> <button onclick="dbgStZero()">スタミナ0</button><br><br>'+
 '<button onclick="dbgFirst50()">第一異能Lv50</button> <button onclick="dbgSecond50()">第二異能Lv50</button> <button onclick="dbgInt100()">統合Lv100</button> <button onclick="dbgRebirth()">転生+1</button><br><br>'+
@@ -1683,7 +1710,7 @@ function serverSave(){saveGame();cloudSaveNow(true);}
 async function cloudLoadInGame(){
  var remote=await cloudFetchRemote(true);if(!remote||!remote.save_data){showMessage('クラウドデータなし','復元できるデータがありません。');return;}
  if(!safeConfirm('現在の端末データをクラウドデータで上書きしますか？'))return;
- try{var restored=JSON.parse(JSON.stringify(remote.save_data));restored._cloudOwnerId=cloudUser.id;localStorage.setItem(SAVE_KEY,JSON.stringify(restored));location.reload();}catch(e){logError(e);showMessage('復元失敗','クラウドデータを端末へ保存できませんでした。');}
+ try{storeRecoveryBackup(state,'クラウド復元前の端末データ');var restored=JSON.parse(JSON.stringify(remote.save_data));restored._cloudOwnerId=cloudUser.id;restored._cloudUpdatedAt=remote.updated_at;localStorage.setItem(SAVE_KEY,JSON.stringify(restored));location.reload();}catch(e){logError(e);showMessage('復元失敗','クラウドデータを端末へ保存できませんでした。');}
 }
 function showSkillDetail(id,phase){var s=findSkill(id,phase)||getSkillById(id);if(!s)return;
 var lp=['first','second','integrated'].filter(function(p){return (state.learned[p]||[]).indexOf(id)>=0;});
