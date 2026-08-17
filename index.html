@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>異能ゲート・クロニクル v26</title>
+<title>異能ゲート・クロニクル v27</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b0b10;color:#e8e6f0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;line-height:1.5}
 #app{max-width:760px;margin:0 auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom))}
@@ -34,7 +34,7 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 .chip{display:inline-block;border:1px solid #444;border-radius:10px;padding:4px 8px;margin:3px;font-size:12px;cursor:pointer}
 .chip.chosen{border-color:#8f6bff;color:#fff;background:#2b2340;font-weight:700}.chip.dim{opacity:.4}
 .equip-slot{background:#151520;border:1px solid #333;border-radius:14px;padding:12px;margin-bottom:10px}
-.item-row{display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid #262633;padding:10px 0}.item-info{flex:1}
+.item-row{display:block;border:1px solid #30303f;border-radius:14px;padding:12px;margin-bottom:10px;background:#101018}.item-info{min-width:0}.item-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.item-actions .equip-main{grid-column:1/-1;border-color:#8f6bff;background:#2b2340;font-weight:700}.item-compare{margin-top:7px;padding:7px 9px;border-radius:9px;background:#181824;color:#c9c5dc;font-size:13px}
 .muted{color:#9a97b0}.progress-label{display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px}.story-text{font-size:17px;line-height:1.9}
 .dbg{border:1px dashed #ff4d6d}
 .lock-card{opacity:.78;border-style:dashed}.guide{border-color:#ffd76b;box-shadow:0 0 0 1px #ffd76b inset}.story-chip{display:inline-block;padding:5px 9px;border-radius:999px;background:#2b2340;color:#d7c4ff;font-size:12px;margin:3px}
@@ -44,7 +44,7 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 <body>
 <div id="app">
 <section id="startScreen">
-<h1>異能ゲート・クロニクル <span class="small">v26</span></h1>
+<h1>異能ゲート・クロニクル <span class="small">v27</span></h1>
 <div class="card"><h2>キャラクター作成</h2>
 <p class="small">名前を入力し、10種の初期異能から1つ選択してください。世界には、条件を満たした者だけが発見できる5つの隠し異能も存在します。</p>
 <input id="playerNameInput" type="text" maxlength="12" placeholder="名前を入力" style="width:100%;font-size:18px;padding:12px;border-radius:12px;border:1px solid #444;background:#0d0d13;color:#fff;margin-bottom:6px;"></div>
@@ -153,6 +153,12 @@ fiction:['死者名簿の余白から、死んだはずの少女が助けを求�
 function isHidden(id){return HIDDEN_IDS.indexOf(id)>=0;}
 function hiddenUnlocked(id){return !isHidden(id)||(state&&state.unlockedHidden&&state.unlockedHidden.indexOf(id)>=0);}
 function selectableAbilities(){return ABILITIES.filter(function(a){return hiddenUnlocked(a.id);});}
+function abilityPlus(id){return state&&state.abilityMastery?Math.max(0,state.abilityMastery[id]||0):0;}
+function abilityName(id){var a=getAbilityById(id),n=a?a.name:'異能';var p=abilityPlus(id);return n+(p>0?' ＋'+p:'');}
+function acquireAbility(id){if(!state||!id)return 0;state.abilityMastery=state.abilityMastery||{};state.abilityAcquired=state.abilityAcquired||{};
+if(state.abilityAcquired[id])state.abilityMastery[id]=(state.abilityMastery[id]||0)+1;else{state.abilityAcquired[id]=true;if(state.abilityMastery[id]==null)state.abilityMastery[id]=0;}return state.abilityMastery[id]||0;}
+function abilityMasteryPower(){if(!state)return 0;if(state.phase==='first')return abilityPlus(state.baseAbility)*5;if(state.phase==='second')return abilityPlus(state.secondAbility)*5;return(abilityPlus(state.baseAbility)+abilityPlus(state.secondAbility))*5;}
+function nextAbilityName(id){var a=getAbilityById(id),n=a?a.name:'異能';if(!state||!state.abilityAcquired||!state.abilityAcquired[id])return n;return n+' ＋'+(abilityPlus(id)+1);}
 function allOwnedItems(){return(state.inventory||[]).concat((state.equipment||[]).filter(Boolean));}
 function gatesClearedThrough(rank){var end=rankIndex(rank);for(var i=0;i<=end;i++){var p=state.gateProgress&&state.gateProgress[GATES[i].name];if(!p||!p.cleared)return false;}return true;}
 function checkHiddenUnlocks(){if(!state)return;state.unlockedHidden=state.unlockedHidden||[];state.hiddenNotices=state.hiddenNotices||[];
@@ -174,20 +180,20 @@ var RIVAL_NAMES={fiction:'白桐トキヤ',blackflame:'焔谷レイ',chronodebt:
 var RANK_ORDER=['F','E','D','C','B','A','S','SS','SSS','EX'];
 function rankIndex(r){return RANK_ORDER.indexOf(r);}
 var GATES=[
-{rank:'F',name:'F級ゲート「薄霧の廃墟」',target:3,exp:70,itemRate:.25,mobs:['灰狼型異界獣','浮遊影','ゲート虫'],bossName:'F級門番・灰狼王'},
-{rank:'E',name:'E級ゲート「雨の交差点」',target:6,exp:110,itemRate:.30,mobs:['雨濡れの獣影','信号に群れる影','霧の捕食者'],bossName:'E級門番・雨音の看守'},
-{rank:'D',name:'D級ゲート「地下鉄結界」',target:7,exp:170,itemRate:.35,mobs:['線路這い','駅舎の亡霊','結晶蝙蝠'],bossName:'D級門番・地下の咆哮'},
-{rank:'C',name:'C級ゲート「焼けた商業街」',target:8,exp:250,itemRate:.40,mobs:['煙の人形','熱灰獣','ガラスの群れ'],bossName:'C級門番・焔の商人'},
-{rank:'B',name:'B級ゲート「崩れた神社」',target:9,exp:360,itemRate:.45,mobs:['歪んだ狛犬','注連縄の影','神域の番鳥'],bossName:'B級門番・折れた神鏡'},
-{rank:'A',name:'A級ゲート「白夜の塔」',target:10,exp:520,itemRate:.50,mobs:['塔の騎士像','白夜の霊蝶','天蓋の眼'],bossName:'A級門番・白夜の王'},
-{rank:'S',name:'S級ゲート「覚醒者の墓」',target:12,exp:800,itemRate:.55,mobs:['墓標の剣','眠る覚醒残響','碑文の獣'],bossName:'S級門番・忘れられた英雄'},
-{rank:'SS',name:'SS級ゲート「異界中枢」',target:14,exp:1300,itemRate:.60,mobs:['中枢防衛体','異界の神経束','観測者残骸'],bossName:'SS級門番・世界調律機'},
-{rank:'SSS',name:'SSS級ゲート「終焉門」',target:16,exp:2200,itemRate:.70,mobs:['終焉の門兵','無色の天使','門の心臓'],bossName:'SSS級門番・はじまりの終わり'},
-{rank:'EX',ex:true,setId:'nameless',reqRebirth:1,reqClears:3,cost:25,name:'EXゲート「無貌の回廊」',target:8,exp:3200,itemRate:.75,
+{rank:'F',name:'F級ゲート「薄霧の廃墟」',target:10,exp:70,itemRate:.25,mobs:['灰狼型異界獣','浮遊影','ゲート虫'],bossName:'F級門番・灰狼王'},
+{rank:'E',name:'E級ゲート「雨の交差点」',target:15,exp:110,itemRate:.30,mobs:['雨濡れの獣影','信号に群れる影','霧の捕食者'],bossName:'E級門番・雨音の看守'},
+{rank:'D',name:'D級ゲート「地下鉄結界」',target:20,exp:170,itemRate:.35,mobs:['線路這い','駅舎の亡霊','結晶蝙蝠'],bossName:'D級門番・地下の咆哮'},
+{rank:'C',name:'C級ゲート「焼けた商業街」',target:25,exp:250,itemRate:.40,mobs:['煙の人形','熱灰獣','ガラスの群れ'],bossName:'C級門番・焔の商人'},
+{rank:'B',name:'B級ゲート「崩れた神社」',target:30,exp:360,itemRate:.45,mobs:['歪んだ狛犬','注連縄の影','神域の番鳥'],bossName:'B級門番・折れた神鏡'},
+{rank:'A',name:'A級ゲート「白夜の塔」',target:40,exp:520,itemRate:.50,mobs:['塔の騎士像','白夜の霊蝶','天蓋の眼'],bossName:'A級門番・白夜の王'},
+{rank:'S',name:'S級ゲート「覚醒者の墓」',target:55,exp:800,itemRate:.55,mobs:['墓標の剣','眠る覚醒残響','碑文の獣'],bossName:'S級門番・忘れられた英雄'},
+{rank:'SS',name:'SS級ゲート「異界中枢」',target:75,exp:1300,itemRate:.60,mobs:['中枢防衛体','異界の神経束','観測者残骸'],bossName:'SS級門番・世界調律機'},
+{rank:'SSS',name:'SSS級ゲート「終焉門」',target:100,exp:2200,itemRate:.70,mobs:['終焉の門兵','無色の天使','門の心臓'],bossName:'SSS級門番・はじまりの終わり'},
+{rank:'EX',ex:true,setId:'nameless',reqRebirth:1,reqClears:3,cost:25,name:'EXゲート「無貌の回廊」',target:120,exp:3200,itemRate:.75,
  mobs:['貌を剥がされた者','回廊の写し身','名前の残骸'],bossName:'EX門番・無貌の主'},
-{rank:'EX',ex:true,setId:'stellar',reqRebirth:2,reqClears:6,cost:30,name:'EXゲート「星骸の海」',target:9,exp:4800,itemRate:.80,
+{rank:'EX',ex:true,setId:'stellar',reqRebirth:2,reqClears:6,cost:30,name:'EXゲート「星骸の海」',target:150,exp:4800,itemRate:.80,
  mobs:['沈んだ星の欠片','海を渡る観測者','骸の潮'],bossName:'EX門番・墜ちた星の心臓'},
-{rank:'EX',ex:true,setId:'primordial',reqRebirth:3,reqClears:10,cost:35,name:'EXゲート「原初の炉」',target:10,exp:7000,itemRate:.85,
+{rank:'EX',ex:true,setId:'primordial',reqRebirth:3,reqClears:10,cost:35,name:'EXゲート「原初の炉」',target:200,exp:7000,itemRate:.85,
  mobs:['炉を守る燃え殻','最初の火の子','鋳造されかけた神'],bossName:'EX門番・世界を鋳た者'}];
 var MILESTONES={first:[3,15,25,35,45],second:[10,20,30,40,50],integrated:[20,40,60,80,100]};
 /* ============ 異能別スキル定義 ============
@@ -1029,16 +1035,21 @@ s.learned[p]=(s.learned[p]||[]).map(function(id){
 if(typeof id!=='string'||id.indexOf('_')>=0)return id;
 var m=/^t(\d)(\w\d)$/.exec(id);if(!m)return id;
 return key+'_'+(parseInt(m[1],10)-1)+'_'+slots.indexOf(m[2]);});});}
+function migrateAbilityMastery(s){if(s.abilityMastery&&s.abilityAcquired)return;
+var counts={};(s.abilityHistory||[]).concat([s.baseAbility,s.secondAbility]).forEach(function(id){if(id)counts[id]=(counts[id]||0)+1;});
+s.abilityMastery={};s.abilityAcquired={};Object.keys(counts).forEach(function(id){s.abilityAcquired[id]=true;s.abilityMastery[id]=Math.max(0,counts[id]-1);});}
+function normalizeEquipmentTypes(s){if(!s)return;s.inventory=s.inventory||[];s.equipment=s.equipment||[];var all=s.equipment.filter(Boolean),ordered=[null,null,null],slot={weapon:0,armor:1,accessory:2};
+all.forEach(function(it){var n=slot[it.type];if(n==null||ordered[n])s.inventory.push(it);else ordered[n]=it;});s.equipment=ordered;}
 function migrate(s){s.statPoints=s.statPoints||0;s.alloc=Object.assign({str:0,vit:0,def:0,agi:0,pow:0},s.alloc||{});
 s.inventory=s.inventory||[];s.equipment=s.equipment||[null,null];
 if((s.dataVersion||0)<24){var rarityMap=[0,2,4,6];
 s.inventory.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});
 s.equipment.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});}
-s.dataVersion=26;
+s.dataVersion=27;
 s.currentGateIndex=clamp(s.currentGateIndex||0,0,GATES.length-1);s.pendingSkills=s.pendingSkills||[];s.battle=null;s.auto=false;s.debugGates=s.debugGates||false;
 s.stamina=s.stamina==null?100:s.stamina;s.staminaTs=s.staminaTs||serverTime();s.arenaPts=s.arenaPts||0;s.playerId=s.playerId||makeId();
 s.learned=s.learned||{first:[],second:[],integrated:[]};s.skillDone=s.skillDone||{first:[],second:[],integrated:[]};
-s.rebirth=s.rebirth||0;s.tut=Object.assign({battles:0,gotItem:false,guideDone:false},s.tut||{});s.integratedReading=s.integratedReading||'';s.frags=s.frags||{};s.carriedSkills=s.carriedSkills||[];s.abilityHistory=s.abilityHistory||[];s.titles=s.titles||[];s.activeTitle=s.activeTitle||null;s.gold=s.gold||0;s.potions=s.potions==null?CONFIG.START_POTIONS:s.potions;s.hpTs=s.hpTs||serverTime();s.iap=Object.assign({noAds:false,passUntil:0},s.iap||{});s.unlockedHidden=s.unlockedHidden||[];[s.baseAbility,s.secondAbility].forEach(function(id){if(id&&isHidden(id)&&s.unlockedHidden.indexOf(id)<0)s.unlockedHidden.push(id);});s.hiddenNotices=s.hiddenNotices||[];s.storySeen=s.storySeen||{};s.storyNotices=s.storyNotices||[];s.totalWins=s.totalWins||0;migrateSkillIds(s);resetDailyOn(s);syncEquipSlots(s);return s;}
+s.rebirth=s.rebirth||0;s.tut=Object.assign({battles:0,gotItem:false,guideDone:false},s.tut||{});s.integratedReading=s.integratedReading||'';s.frags=s.frags||{};s.carriedSkills=s.carriedSkills||[];s.abilityHistory=s.abilityHistory||[];s.titles=s.titles||[];s.activeTitle=s.activeTitle||null;s.gold=s.gold||0;s.potions=s.potions==null?CONFIG.START_POTIONS:s.potions;s.hpTs=s.hpTs||serverTime();s.iap=Object.assign({noAds:false,passUntil:0},s.iap||{});s.unlockedHidden=s.unlockedHidden||[];[s.baseAbility,s.secondAbility].forEach(function(id){if(id&&isHidden(id)&&s.unlockedHidden.indexOf(id)<0)s.unlockedHidden.push(id);});s.hiddenNotices=s.hiddenNotices||[];s.storySeen=s.storySeen||{};s.storyNotices=s.storyNotices||[];s.totalWins=s.totalWins||0;migrateSkillIds(s);migrateAbilityMastery(s);normalizeEquipmentTypes(s);resetDailyOn(s);syncEquipSlots(s);return s;}
 function syncEquipSlots(s){if(!s)return;s.equipment=s.equipment||[];
 var want=(s.iap&&s.iap.passUntil>serverTime())?IAP.PASS_EQUIP_SLOTS:CONFIG.EQUIP_SLOTS;
 while(s.equipment.length<want)s.equipment.push(null);
@@ -1078,10 +1089,11 @@ if(!name){showMessage('名前未入力','キャラクター名を入力してく
 if(!selectedAbility){showMessage('異能未選択','リストから初期異能を1つ選択してください。');return;}
 if(hasSave()&&!safeConfirm('既存のセーブデータを上書きして新しく始めますか？'))return;
 tierCache={};
-state={dataVersion:26,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
+state={dataVersion:27,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
 alloc:{str:0,vit:0,def:0,agi:0,pow:0},currentGateIndex:0,stamina:100,staminaTs:serverTime(),hpTs:serverTime(),arenaPts:0,playerId:makeId(),auto:false,debugGates:false,
 learned:{first:[],second:[],integrated:[]},skillDone:{first:[],second:[],integrated:[]},
-inventory:[],equipment:[null,null],tut:{battles:0,gotItem:false,guideDone:false},frags:{},carriedSkills:[],abilityHistory:[],titles:[],activeTitle:null,gold:CONFIG.START_GOLD,potions:CONFIG.START_POTIONS,iap:{noAds:false,passUntil:0},gateProgress:{},absorbed:[],pendingSkills:[],battle:null,bots:null,pvpTarget:null,unlockedHidden:[],hiddenNotices:[],storySeen:{},storyNotices:[],totalWins:0};
+inventory:[],equipment:[null,null,null],tut:{battles:0,gotItem:false,guideDone:false},frags:{},carriedSkills:[],abilityHistory:[],abilityMastery:{},abilityAcquired:{},titles:[],activeTitle:null,gold:CONFIG.START_GOLD,potions:CONFIG.START_POTIONS,iap:{noAds:false,passUntil:0},gateProgress:{},absorbed:[],pendingSkills:[],battle:null,bots:null,pvpTarget:null,unlockedHidden:[],hiddenNotices:[],storySeen:{},storyNotices:[],totalWins:0};
+acquireAbility(selectedAbility);
 resetDailyOn(state);state.hp=getStats().hp;updateRank();
 hideStartScreen();document.getElementById('mainScreen').style.display='block';renderAll();showStory();}
 function showStory(){showModal('<h2>覚醒</h2><div class="story-text">空が、最初に割れたのは東京だった。<br><br>世界各地に「ゲート」と呼ばれる亀裂が現れ、異界からモンスターが溢れ出した。<br><br>同時に、一部の人間は魂に眠る異能へ覚醒し始める。<br><br>'+state.name+'。<br>お前の眼前にも、半透明のステータスウィンドウが浮かんでいる。<br><br>【メインクエスト発生】<br>モンスターを狩り、ゲートを閉じ、世界を救え。<br>そして――最強になれ。</div><button class="primary" onclick="startTutorial(0)">受け入れる</button>');}
@@ -1107,7 +1119,7 @@ function getRankColor(r){if(r==='SSS')return'#ffd76b';if(r==='SS')return'#ff9ff3
 function getPhaseLabel(){if(state.phase==='first')return'第一異能';if(state.phase==='second')return'ダブル異能';return'統合異能';}
 function getCurrentAbilityId(){if(!state)return null;if(state.phase==='first')return state.baseAbility;if(state.phase==='second')return state.secondAbility;return'integrated';}
 function getCurrentAbilityEffect(){var id=getCurrentAbilityId();if(id==='integrated')return'integrated';var ab=getAbilityById(id);return ab?ab.effect:'none';}
-function getPhaseAbilityName(p){if(p==='first')return(getAbilityById(state.baseAbility)||{}).name||'第一異能';if(p==='second')return(getAbilityById(state.secondAbility)||{}).name||'第二異能';return state.integratedName||'統合異能';}
+function getPhaseAbilityName(p){if(p==='first')return state.baseAbility?abilityName(state.baseAbility):'第一異能';if(p==='second')return state.secondAbility?abilityName(state.secondAbility):'第二異能';return state.integratedName||'統合異能';}
 function applyEffect(st,e){for(var k in e){var v=e[k];
 if(k==='atk')st.atk+=v;if(k==='def')st.def+=v;if(k==='hp')st.hp+=v;if(k==='crit')st.crit+=v;if(k==='dodge')st.dodge+=v;
 if(k==='abilityPower')st.abilityPower+=v;if(k==='defHeal')st.defHeal+=v;if(k==='follow')st.follow+=v;if(k==='lifesteal')st.lifesteal+=v;}}
@@ -1134,6 +1146,7 @@ if(ef==='blackflame')st.lifesteal+=8;
 if(ef==='gravity')st.lifesteal+=7;
 if(ef==='shadow')st.lifesteal+=4;if(ef==='gravity')st.atk+=6;if(ef==='blackflame')st.abilityPower+=10;
 if(ef==='integrated'){st.crit+=10;st.dodge+=10;st.lifesteal+=10;st.abilityPower+=50;}
+st.abilityPower+=abilityMasteryPower();
 learnedSkills().forEach(function(s){if(s.cat==='passive')applyEffect(st,s);});
 state.equipment.forEach(function(it){if(!it)return;st.atk+=effStat(it,'atk');st.def+=effStat(it,'def');st.hp+=effStat(it,'hp');st.crit+=effStat(it,'crit');st.dodge+=effStat(it,'dodge');});
 st.atk+=state.alloc.str*2;st.hp+=state.alloc.vit*12;st.def+=state.alloc.def*2;
@@ -1156,7 +1169,7 @@ function updateTabBadge(){var b=document.getElementById('tabButton_status');if(b
 function switchTab(t){currentTab=t;['explore','battle','daily','status','skill','equip','record','shop'].forEach(function(x){
 document.getElementById('tab_'+x).style.display=x===t?'block':'none';var b=document.getElementById('tabButton_'+x);if(b)b.classList.toggle('active',x===t);});renderAll();}
 function renderHeader(){var st=getStats();var expText=state.level>=levelCap()?'MAX':state.exp+' / '+expNeed();
-var abName=state.phase==='integrated'?(state.integratedName+(state.integratedReading?'（'+state.integratedReading+'）':'')):(getAbilityById(getCurrentAbilityId())||{}).name;
+var abName=state.phase==='integrated'?(state.integratedName+(state.integratedReading?'（'+state.integratedReading+'）':'')+'／素材強化＋'+(abilityPlus(state.baseAbility)+abilityPlus(state.secondAbility))):(state.baseAbility?abilityName(getCurrentAbilityId()):'なし');
 document.getElementById('headerInfo').innerHTML=
 '<h2 style="margin:0 0 8px;">'+state.name+'</h2>'+
 '<div class="stat-line"><span class="rank-badge" style="color:'+getRankColor(state.rank)+';border:1px solid '+getRankColor(state.rank)+'">ランク '+state.rank+'</span>'+
@@ -1192,16 +1205,16 @@ function enterGate(i){if(state.battle&&!state.battle.over)return;if(!gateUnlocke
 function renderExplore(){var inBattle=state.battle&&!state.battle.over;var list='';
 GATES.forEach(function(g,i){var p=getGateProgress(g);
 if(!gateUnlocked(g)){list+='<div class="card" style="opacity:.55;"><strong>'+g.name+'</strong><div class="small">'+(g.ex?'特殊ゲート':'入場ランク '+g.rank+' 必要')+'</div><div style="color:#ff4d6d;font-weight:700;margin-top:6px;">'+(g.ex?exLockText(g):'ランク不足（現在 '+state.rank+'）')+'</div></div>';}
-else{var cur=state.currentGateIndex===i;list+='<div class="card '+(cur?'selected':'')+'"><strong>'+g.name+'</strong><div class="small">ランク '+g.rank+' / 敵Lv'+enemyLevelFor(g)+'（自分 Lv'+state.level+'） / 討伐 '+p.kills+'/'+g.target+(p.cleared?' / クリア済み':'')+' / スタミナ'+gateCost(g)+'</div>'+(g.ex?'<div class="small" style="color:#ffd76b;">EXゲート：ごく低確率でレジェンドシリーズ装備</div>':'')+(enemyLevelFor(g)>state.level+2?'<div class="small" style="color:#ff9c9c;">格上：まだ苦戦する</div>':(enemyLevelFor(g)<state.level-4?'<div class="small" style="color:#7dffb0;">格下：安定して狩れる</div>':''))+'<button style="margin-top:8px;" onclick="enterGate('+i+')" '+(inBattle?'disabled':'')+'>'+(cur?'探索中':'入場する')+'</button></div>';}});
+else{var cur=state.currentGateIndex===i,born=p.kills>=g.target;list+='<div class="card '+(cur?'selected':'')+'"><strong>'+g.name+'</strong><div class="small">ランク '+g.rank+' / 敵Lv'+enemyLevelFor(g)+'（自分 Lv'+state.level+'） / 総討伐 '+p.kills+'体 / ボス '+(born?'出現済み':'あと'+(g.target-p.kills)+'体')+(p.cleared?' / クリア済み':'')+' / スタミナ'+gateCost(g)+'</div>'+(g.ex?'<div class="small" style="color:#ffd76b;">EXゲート：ごく低確率でレジェンドシリーズ装備</div>':'')+(enemyLevelFor(g)>state.level+2?'<div class="small" style="color:#ff9c9c;">格上：まだ苦戦する</div>':(enemyLevelFor(g)<state.level-4?'<div class="small" style="color:#7dffb0;">格下：安定して狩れる</div>':''))+'<button style="margin-top:8px;" onclick="enterGate('+i+')" '+(inBattle?'disabled':'')+'>'+(cur?'探索中':'入場する')+'</button></div>';}});
 var gate=getCurrentGate();var prog=getGateProgress(gate);var bossAvail=prog.kills>=gate.target;
 var aw='';if(state.phase==='first'&&state.level>=50)aw='<button class="primary wide" onclick="openAwakening()">異能覚醒クエスト</button>';
 if(state.phase==='second'&&state.level>=50)aw='<button class="primary wide" onclick="doIntegration()">異能統合覚醒</button>';
 if(state.phase==='integrated'&&state.level>=levelCap())aw='<button class="danger wide" onclick="openReincarnation()">転生する</button>';
 document.getElementById('exploreContent').innerHTML=
 '<div class="card"><h3 style="margin-top:0;">現在地：'+gate.name+'</h3>'+
-'<div class="progress-label"><span>討伐数</span><span>'+prog.kills+' / '+gate.target+'</span></div>'+
+'<div class="progress-label"><span>通常敵の総討伐数</span><span>'+prog.kills+'体</span></div>'+
 '<div class="bar"><div class="bar-fill exp-fill" style="width:'+Math.min(100,(prog.kills/gate.target)*100)+'%"></div></div>'+
-'<div class="small" style="margin-top:8px;">'+(prog.cleared?'ゲート完全クリア済み。':'討伐目標到達でボス出現。')+'</div>'+
+'<div class="small" style="margin-top:8px;">'+(prog.cleared?'ゲート完全クリア済み。ボス再戦と通常敵の周回が可能。':(bossAvail?'ボス出現済み。勝てない場合は通常敵を周回してさらに育成できる。':'あと'+(gate.target-prog.kills)+'体討伐でボス出現。'))+'</div>'+
 '<div class="small" style="margin-top:8px;color:#9a97b0;">HPは5分ごとに最大値の1%だけ自然回復する。急ぐなら'+POTION.name+'を使うこと。</div>'+
 '<button style="margin-top:8px;width:100%;" onclick="usePotionField()" '+((!state.potions||state.hp>=getStats().hp)?'disabled':'')+'>'+POTION.name+'を使う（'+(state.potions||0)+'個／+'+potionHeal()+'）</button></div>'+
 '<div class="action-bar"><button onclick="startBattle(\'mob\')" '+(inBattle?'disabled':'')+'>モンスター('+gateCost(gate)+')</button>'+
@@ -1595,7 +1608,7 @@ var first=makeItem(gate,false,1,1);first.reqLv=1;
 if(addItem(first))addLog('【初めての戦利品】'+RARITIES[first.rarity].n+' '+first.name+' を手に入れた。装備タブから装備できる。','crit',true);}
 else if(Math.random()<gate.itemRate||enemy.isBoss){var it=makeItem(gate,enemy.isBoss);if(addItem(it))addLog('アイテム「'+RARITIES[it.rarity].n+' '+it.name+'」（要Lv'+it.reqLv+'）を入手した。','important');}
 var m=state.daily.missions;m.wins++;if(['boss','daily','world'].indexOf(enemy.type)>=0)m.bosses++;
-if(enemy.type==='mob'){var p=getGateProgress(gate);if(p.kills<gate.target)p.kills++;if(p.kills>=gate.target)addLog('ゲートの奥で、ボスの気配が濃くなった。','important',true);}
+if(enemy.type==='mob'){var p=getGateProgress(gate);p.kills++;if(p.kills===gate.target)addLog('【ボス出現】必要討伐数に到達した。ゲートの奥で、強大な気配が目覚める。','important',true);}
 if(enemy.type==='boss'){var p2=getGateProgress(gate);p2.cleared=true;p2.clears=(p2.clears||0)+1;
 addLog('【ゲート完全クリア】'+gate.name+(gate.rank==='SSS'?'（通算 '+p2.clears+' 回）':''),'important',true);
 if(gate.rank==='SSS'){GATES.forEach(function(g2){if(g2.ex&&gateUnlocked(g2)&&!state.exNotified){state.exNotified=true;
@@ -1767,9 +1780,15 @@ function itemStatText(it){var p=[];
 if(it.atk)p.push('攻撃+'+effStat(it,'atk'));if(it.def)p.push('防御+'+effStat(it,'def'));if(it.hp)p.push('HP+'+effStat(it,'hp'));
 if(it.crit)p.push('クリ+'+effStat(it,'crit')+'%');if(it.dodge)p.push('回避+'+effStat(it,'dodge')+'%');
 return p.join(' / ')||'効果なし';}
+function equipSlotIndex(type){return{weapon:0,armor:1,accessory:2}[type];}
+function equipSlotName(s){return['武器','防具','アクセサリー'][s]||('装備枠'+(s+1));}
+function equippedType(type){var s=equipSlotIndex(type);return s==null?null:state.equipment[s];}
+function compareItemText(it){var old=equippedType(it.type);if(!old)return'現在：未装備 → 装備すると '+itemStatText(it);
+var keys=[['atk','攻撃'],['def','防御'],['hp','HP'],['crit','クリ'],['dodge','回避']],out=[];
+keys.forEach(function(x){var a=effStat(old,x[0]),b=effStat(it,x[0]),d=b-a;if(d)out.push(x[1]+' '+(d>0?'＋':'')+d+(x[0]==='crit'||x[0]==='dodge'?'%':''));});return out.length?'現在装備との差：'+out.join(' / '):'現在装備とほぼ同等';}
 function renderEquip(){var n=equipSlots();var idx=[];for(var q=0;q<n;q++)idx.push(q);
 var slots=idx.map(function(s){var it=state.equipment[s];
-return '<div class="equip-slot"><div class="small">装備枠'+(s+1)+'</div>'+(it?'<strong style="color:'+RARITIES[it.rarity].c+'">'+itemLabel(it)+'</strong><div class="small">'+it.typeLabel+' / '+itemStatText(it)+'</div>'+
+return '<div class="equip-slot"><div class="small">'+equipSlotName(s)+'</div>'+(it?'<strong style="color:'+RARITIES[it.rarity].c+'">'+itemLabel(it)+'</strong><div class="small">'+itemStatText(it)+'</div>'+
 '<div class="small" style="margin-top:4px;">強化 +'+(it.plus||0)+' / +'+ENHANCE.max+((it.plus||0)<ENHANCE.max?'　次の強化 '+enhanceCost(it)+'G':'　上限')+'</div>'+
 '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'+
 '<button onclick="enhanceSlot('+s+')" '+(((it.plus||0)>=ENHANCE.max||state.gold<enhanceCost(it))?'disabled':'')+'>強化</button>'+
@@ -1779,11 +1798,12 @@ var sorted=state.inventory.map(function(it,i){return{it:it,i:i};}).sort(function
 var inv=state.inventory.length?sorted.map(function(x){var it=x.it,i=x.i;var can=(it.reqLv||1)<=state.level;
 return '<div class="item-row"><div class="item-info"><strong style="color:'+RARITIES[it.rarity].c+'">'+itemLabel(it)+'</strong>'+(it.locked?' <span class="small" style="color:#ffd76b;">ロック</span>':'')+
 '<div class="small">'+it.typeLabel+' / '+itemStatText(it)+'</div>'+
-'<div class="small" style="color:'+(can?'#9a97b0':'#ff9c9c')+'">要求 Lv'+(it.reqLv||1)+(can?'':'（装備不可）')+' / 売値 '+sellPrice(it)+'G</div></div>'+
-'<div style="display:flex;gap:6px;flex-wrap:wrap;">'+idx.map(function(sl){return '<button onclick="equipItem('+i+','+sl+')" '+(can?'':'disabled')+'>枠'+(sl+1)+'</button>';}).join('')+
+'<div class="small" style="color:'+(can?'#9a97b0':'#ff9c9c')+'">要求 Lv'+(it.reqLv||1)+(can?'（装備可能）':'（装備不可）')+' / 売値 '+sellPrice(it)+'G</div>'+
+'<div class="item-compare">'+compareItemText(it)+'</div></div>'+
+'<div class="item-actions"><button class="equip-main" onclick="equipItem('+i+')" '+(can?'':'disabled')+'>'+equipSlotName(equipSlotIndex(it.type))+'に装備する</button>'+
 '<button onclick="toggleLock('+i+')">'+(it.locked?'解除':'ロック')+'</button>'+
 '<button class="danger" onclick="sellItem('+i+')" '+(it.locked?'disabled':'')+'>売却</button></div></div>';}).join(''):'<p class="small">アイテムを持っていない。</p>';
-document.getElementById('equipContent').innerHTML='<div class="card"><h3 style="margin-top:0;">装備</h3><div class="small">装備枠'+n+'つ。武器・防具・アクセサリーは各1つまで。覚醒者パス中は所持品上限が'+IAP.PASS_INVENTORY_MAX+'枠になる。</div>'+
+document.getElementById('equipContent').innerHTML='<div class="card"><h3 style="margin-top:0;">装備</h3><div class="small">武器・防具・アクセサリーを各1つ装備できる。所持品の「装備する」を押すと対応する枠へ自動装備される。覚醒者パス中は所持品上限が'+IAP.PASS_INVENTORY_MAX+'枠になる。</div>'+
 '<div class="stat-line" style="margin-top:8px;"><span style="color:#ffd76b;">所持金 '+state.gold+' G</span><span>所持枠 '+state.inventory.length+' / '+inventoryMax()+'</span></div>'+
 (state.inventory.length>=inventoryMax()?'<div class="small" style="color:#ff9c9c;">枠が一杯：新しく拾った装備は、弱い方が自動的に売却される。</div>':'')+'</div>'+slots+
 '<div class="card"><h3 style="margin-top:0;">所持アイテム</h3>'+
@@ -1791,10 +1811,8 @@ document.getElementById('equipContent').innerHTML='<div class="card"><h3 style="
 function syncEquipLevel(){if(!state)return;var moved=0;
 state.equipment.forEach(function(it,i){if(it&&(it.reqLv||1)>state.level){state.equipment[i]=null;state.inventory.push(it);moved++;}});
 return moved;}
-function equipItem(i,s){var it=state.inventory[i];if(!it)return;if(s>=equipSlots())return;
+function equipItem(i){var it=state.inventory[i];if(!it)return;var s=equipSlotIndex(it.type);if(s==null||s>=equipSlots())return;
 if((it.reqLv||1)>state.level){showMessage('装備不可','この装備は Lv'+it.reqLv+' から使用できる。<br>現在 Lv'+state.level+'。');return;}
-var dup=false;state.equipment.forEach(function(oi,oidx){if(oidx!==s&&oi&&oi.type===it.type)dup=true;});
-if(dup){showMessage('装備不可','同じ種別の装備は同時に装備できない。');return;}
 if(state.equipment[s])state.inventory.push(state.equipment[s]);state.equipment[s]=it;state.inventory.splice(i,1);clampHp();renderAll();}
 function unequipSlot(s){var it=state.equipment[s];if(!it)return;state.inventory.push(it);state.equipment[s]=null;clampHp();renderAll();}
 function buyPotion(n){n=n||1;var cost=POTION.price*n;
@@ -1937,12 +1955,13 @@ return '<span class="chip '+(owned2?'chosen':'dim')+'">'+(owned2?p.name:'？？�
 document.getElementById('recordContent').innerHTML=story+hidden+guide+th+sets+'<div class="card"><h3 style="margin-top:0;">異能録</h3></div>'+ab+'<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">完全クリア済みゲート</h3></div>'+ch;}
 function openAwakening(){if(state.phase!=='first'||state.level<50)return;var rv=selectableAbilities().filter(function(a){return a.id!==state.baseAbility;});
 showModal('<h3>異能覚醒クエスト</h3><p>他の覚醒者を選び、その異能を奪え。<br>勝利すれば、お前はダブル異能者となる。</p>'+
-rv.map(function(a){return '<button class="skill-option" onclick="startRivalBattle(\''+a.id+'\')"><strong>'+RIVAL_NAMES[a.id]+'</strong><span class="desc">異能「'+a.name+'」 / '+a.role+' / リソース：'+A_DATA[a.id].res+'</span></button>';}).join(''));}
+rv.map(function(a){return '<button class="skill-option" onclick="startRivalBattle(\''+a.id+'\')"><strong>'+RIVAL_NAMES[a.id]+'</strong><span class="desc">異能「'+nextAbilityName(a.id)+'」 / '+a.role+' / リソース：'+A_DATA[a.id].res+(state.abilityAcquired&&state.abilityAcquired[a.id]?'<br>再習得：異能効果がさらに＋5%強化される':'')+'</span></button>';}).join(''));}
 function startRivalBattle(id){closeModal();startBattle('rival',id);}
 function absorbAbility(id){if(state.phase!=='first')return;var ab=getAbilityById(id);
+acquireAbility(id);
 state.secondAbility=id;state.absorbed.push(id);state.phase='second';state.level=1;state.exp=0;state.pendingSkills=[];state.currentGateIndex=6;state.auto=false;stopAuto();
 delete tierCache.integrated;updateRank();state.hp=getStats().hp;syncPending();
-showMessage('異能吸収',RIVAL_NAMES[id]+'の異能「'+ab.name+'」を吸収した。<br><br>異能録に記憶が記録された。<br>これより、お前はダブル異能者として戦う。<br><br>リソースは「'+A_DATA[id].res+'」に変わり、スキルも全て新しくなる。<br>元の異能はカンスト済み。<br>新しい異能はレベル1から育成される。');renderAll();}
+showMessage('異能吸収',RIVAL_NAMES[id]+'の異能「'+abilityName(id)+'」を吸収した。<br><br>'+(abilityPlus(id)>0?'再習得により、この異能の効果が累計＋'+(abilityPlus(id)*5)+'%強化された。<br><br>':'')+'異能録に記憶が記録された。<br>これより、お前はダブル異能者として戦う。<br><br>リソースは「'+A_DATA[id].res+'」に変わり、スキルも全て新しくなる。<br>元の異能はカンスト済み。<br>新しい異能はレベル1から育成される。');renderAll();}
 function doIntegration(){if(state.phase!=='second'||state.level<50)return;var a=getAbilityById(state.baseAbility);var b=getAbilityById(state.secondAbility);
 state.integratedName=fusedName();state.integratedReading=fusedReading();state.phase='integrated';state.level=1;state.exp=0;state.pendingSkills=[];state.currentGateIndex=7;state.auto=false;stopAuto();
 delete tierCache.integrated;updateRank();state.hp=getStats().hp;syncPending();
@@ -1971,10 +1990,9 @@ function toggleCarry(i){var n=carrySlots();var k=rbPick.indexOf(i);
 if(k>=0)rbPick.splice(k,1);else{if(rbPick.length>=n)return;rbPick.push(i);}
 renderCarrySelect();}
 function openAbilitySelect(){
-var used=[state.baseAbility,state.secondAbility];
-var cand=selectableAbilities().filter(function(a){return used.indexOf(a.id)<0;});
-showModal('<h3>新しい第一異能を選ぶ</h3><p class="small">前回使っていた異能（'+used.map(function(u){var a=getAbilityById(u);return a?a.name:'—';}).join('・')+'）は選べない。<br>第二異能は、Lv50到達後の覚醒クエストで改めて奪う。</p>'+
-cand.map(function(a){return '<button class="skill-option" onclick="confirmRebirth(\''+a.id+'\')"><strong style="color:'+a.color+'">'+a.name+'</strong><span class="desc">'+a.reading+' / '+a.role+'<br>'+a.desc+'<br>リソース：'+A_DATA[a.id].res+' ／ 継続ダメージ：'+A_DATA[a.id].dot+'</span></button>';}).join('')+
+var cand=selectableAbilities();
+showModal('<h3>新しい第一異能を選ぶ</h3><p class="small">過去に習得した異能を再び選ぶと「異能＋1」となり、その異能効果がさらに5%強化される。<br>第二異能は、Lv50到達後の覚醒クエストで改めて奪う。</p>'+
+cand.map(function(a){var repeat=state.abilityAcquired&&state.abilityAcquired[a.id];return '<button class="skill-option" onclick="confirmRebirth(\''+a.id+'\')"><strong style="color:'+a.color+'">'+nextAbilityName(a.id)+'</strong><span class="desc">'+a.reading+' / '+a.role+'<br>'+a.desc+'<br>リソース：'+A_DATA[a.id].res+' ／ 継続ダメージ：'+A_DATA[a.id].dot+(repeat?'<br><span style="color:#ffd76b;">再習得ボーナス：異能効果＋5%</span>':'')+'</span></button>';}).join('')+
 '<button onclick="renderCarrySelect()">スキル選択に戻る</button>');}
 function confirmRebirth(newAbility){
 var all=learnedSkills();
@@ -1986,6 +2004,7 @@ if(state.secondAbility)state.abilityHistory.push(state.secondAbility);
 state.rebirth++;
 state.carriedSkills=carried;
 state.phase='first';state.baseAbility=newAbility;state.secondAbility=null;state.integratedName=null;
+acquireAbility(newAbility);
 state.level=1;state.exp=0;state.statPoints=0;state.alloc={str:0,vit:0,def:0,agi:0,pow:0};
 state.learned={first:[],second:[],integrated:[]};state.skillDone={first:[],second:[],integrated:[]};
 state.pendingSkills=[];state.gateProgress={};state.currentGateIndex=0;state.absorbed=[];
@@ -1995,7 +2014,7 @@ tierCache={};updateRank();syncEquipLevel();state.hp=getStats().hp;state.hpTs=ser
 closeModal();renderAll();
 var ab=getAbilityById(newAbility);
 showModal('<h3>転生</h3><div class="story-text">世界が一度暗くなり、次に目を開けた時、'+state.name+'の魂には別の異能が根を張っていた。<br><br>新しい異能「'+ab.name+'」。<br>リソースは「'+A_DATA[newAbility].res+'」へ変わった。<br><br>持ち込んだ'+carried.length+'個の技だけが、前の生の記憶として残っている。</div>'+
-'<p class="small">転生'+state.rebirth+'回目／基礎+'+Math.round(state.rebirth*CONFIG.REINCARNATION_BONUS*100)+'%／経験値×'+Math.pow(EXP_TUNING.rebirthMult,state.rebirth).toFixed(2)+'／敵+'+Math.round(state.rebirth*ENEMY_TUNING.rebirthScale*100)+'%<br>装備は持ち越したが、要求レベルを満たすまで使えない。</p>'+
+'<p class="small">'+abilityName(newAbility)+'／異能強化＋'+(abilityPlus(newAbility)*5)+'%<br>転生'+state.rebirth+'回目／基礎+'+Math.round(state.rebirth*CONFIG.REINCARNATION_BONUS*100)+'%／経験値×'+Math.pow(EXP_TUNING.rebirthMult,state.rebirth).toFixed(2)+'／敵+'+Math.round(state.rebirth*ENEMY_TUNING.rebirthScale*100)+'%<br>装備は持ち越したが、要求レベルを満たすまで使えない。</p>'+
 '<button class="primary" onclick="closeModal()">始める</button>');
 processPendingSkills();}
 var passWasOn=false;
