@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>異能ゲート・クロニクル v37</title>
+<title>異能ゲート・クロニクル v38</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b0b10;color:#e8e6f0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;line-height:1.5}
 #app{max-width:760px;margin:0 auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom))}
@@ -44,7 +44,7 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 <body>
 <div id="app">
 <section id="startScreen">
-<h1>異能ゲート・クロニクル <span class="small">v37</span></h1>
+<h1>異能ゲート・クロニクル <span class="small">v38</span></h1>
 <div class="card"><h2>キャラクター作成</h2>
 <p class="small">名前を入力し、10種の初期異能から1つ選択してください。世界には、条件を満たした者だけが発見できる5つの隠し異能も存在します。</p>
 <input id="playerNameInput" type="text" maxlength="12" placeholder="名前を入力" style="width:100%;font-size:18px;padding:12px;border-radius:12px;border:1px solid #444;background:#0d0d13;color:#fff;margin-bottom:6px;"></div>
@@ -106,7 +106,8 @@ var REQ_BASE={F:1,E:8,D:15,C:25,B:35,A:45,S:50,SS:65,SSS:80,EX:100};
 var SAVE_KEY='ign_save_v1';
 var BACKUP_KEY='ign_save_backups_v1';
 var CLOUD_GAME_ID='inou_chronicle';
-var PVP_DATA_VERSION=1;
+var PVP_DATA_VERSION=2;
+var CLIENT_BUILD_VERSION=38;
 var PVP_SEASON_ID='preseason-1';
 var SUPABASE_URL='https://ybbolpaerkhozzxlsvag.supabase.co';
 var SUPABASE_PUBLISHABLE_KEY='sb_publishable_xJ2RGNNCbWGBB0kd2LO2Ag_LJuQw0VB';
@@ -1214,14 +1215,16 @@ async function beginServerPvpMatch(target){
  if(!target||!target.online||!target.userId)return null;
  if(!cloudReady&&!(await cloudInit()))return null;
  if(cloudIsAnonymous())return null;
- try{var res=await cloudClient.rpc('start_pvp_match',{p_defender_id:target.userId});if(res.error)throw res.error;return res.data||null;}
- catch(e){logError(e);pvpOnlineStatus='対戦開始失敗（BOTへ切替）';return null;}
+ try{var res=await cloudClient.rpc('start_pvp_match_v2',{p_defender_id:target.userId,p_client_version:CLIENT_BUILD_VERSION});if(res.error)throw res.error;var d=res.data||null;if(!d||!d.match_id||!d.proof_token)throw new Error('invalid match proof');return d;}
+ catch(e){logError(e);pvpOnlineStatus='対戦開始失敗（サーバー更新を確認）';return null;}
 }
 async function submitPvpResult(attackerWon,battle){
  var matchId=battle&&battle.enemy&&battle.enemy.matchId;if(!matchId||pvpResultBusy)return false;
  pvpResultBusy=true;migratePvpState(state);state.pvp.activeMatchId=matchId;state.pvp.lastResultText='結果送信中…';saveGame();if(currentTab==='daily')renderDaily();
  try{
-  var res=await cloudClient.rpc('finish_pvp_match',{p_match_id:matchId,p_attacker_won:!!attackerWon});if(res.error)throw res.error;
+  var audit=battle.pvpAudit||{};
+  var payload={proof_token:String(battle.enemy.proofToken||''),client_version:CLIENT_BUILD_VERSION,action_count:Math.max(0,Number(audit.actions)||0),duration_ms:Math.max(0,Date.now()-(Number(audit.startedAt)||Date.now())),attacker_start_hp:Math.max(1,Number(audit.attackerStartHp)||1),defender_start_hp:Math.max(1,Number(audit.defenderStartHp)||1),attacker_end_hp:Math.max(0,Number(state.hp)||0),defender_end_hp:Math.max(0,Number(battle.enemy.hp)||0)};
+  var res=await cloudClient.rpc('finish_pvp_match_v2',{p_match_id:matchId,p_attacker_won:!!attackerWon,p_result:payload});if(res.error)throw res.error;
   var row=Array.isArray(res.data)?res.data[0]:res.data;if(!row)throw new Error('empty pvp result');
   state.pvp.rating=Number(row.new_rating)||0;state.pvp.seasonPoints=Number(row.new_season_points)||0;state.pvp.wins=Number(row.total_wins)||0;state.pvp.losses=Number(row.total_losses)||0;state.pvp.bestRating=Math.max(state.pvp.bestRating||1000,state.pvp.rating);state.pvp.lastMatchAt=new Date().toISOString();state.pvp.activeMatchId=null;
   var delta=Number(row.rating_delta)||0;state.pvp.lastResultText=(attackerWon?'勝利':'敗北')+' / Rate '+(delta>=0?'+':'')+delta+' → '+state.pvp.rating;saveGame();await fetchPvpProfiles(false);await fetchPvpHistory(false);showMessage('オンライン対戦結果',state.pvp.lastResultText+'<br>シーズンPt '+state.pvp.seasonPoints+'<br>戦績 '+state.pvp.wins+'勝 '+state.pvp.losses+'敗');return true;
@@ -1425,7 +1428,7 @@ function pvpEnemy(bot){var p=bot?bot.power:500,snap=bot&&bot.snapshot,ss=snap&&s
 var atk=ss&&Number(ss.atk)>0?Math.floor(Number(ss.atk)):Math.floor(p*0.10+8),def=ss&&Number(ss.def)>0?Math.floor(Number(ss.def)):Math.floor(p*0.05+4);
 if(style==='aggressive'){atk=Math.floor(atk*1.10);def=Math.max(1,Math.floor(def*0.95));}else if(style==='defensive'){atk=Math.max(1,Math.floor(atk*0.92));def=Math.floor(def*1.15);}
 return{name:'【アリーナ】'+(bot?bot.name:'???'),type:'pvp',fxKey:'__arena',rivalId:null,isBoss:true,hp:hp,maxhp:hp,
-atk:atk,def:def,crit:ss?Number(ss.crit)||12:12,dodge:ss?Number(ss.dodge)||10:10,speed:ss?Number(ss.speed)||12:12+Math.floor(p/300),burn:0,stun:0,online:!!(bot&&bot.online),opponentUserId:bot&&bot.userId||null,opponentRating:bot&&bot.rating||1000,aiStyle:style,matchId:bot&&bot.matchId||null};}
+atk:atk,def:def,crit:ss?Number(ss.crit)||12:12,dodge:ss?Number(ss.dodge)||10:10,speed:ss?Number(ss.speed)||12:12+Math.floor(p/300),burn:0,stun:0,online:!!(bot&&bot.online),opponentUserId:bot&&bot.userId||null,opponentRating:bot&&bot.rating||1000,aiStyle:style,matchId:bot&&bot.matchId||null,proofToken:bot&&bot.proofToken||null};}
 async function startPvp(targetUserId){
  if(pvpMatchBusy||pvpResultBusy)return;if(state.pendingSkills.length){processPendingSkills();return;}if(state.battle&&!state.battle.over){switchTab('battle');return;}if(state.stamina<COST.pvp){showMessage('スタミナ不足','スタミナ'+COST.pvp+'必要。時間回復または広告で回復できます。');return;}
  pvpMatchBusy=true;try{
@@ -1439,7 +1442,7 @@ async function startPvp(targetUserId){
   }else if(pool.length){
    var pp=playerPower();pool.sort(function(a,b){return Math.abs(a.power-pp)-Math.abs(b.power-pp);});onlineTarget=pool[Math.floor(Math.random()*Math.min(3,pool.length))]||pool[0];
   }
-  if(onlineTarget){var matchId=await beginServerPvpMatch(onlineTarget);if(matchId){onlineTarget=Object.assign({},onlineTarget,{matchId:matchId});state.pvp.activeMatchId=matchId;state.pvpTarget=onlineTarget;}else if(explicit){showMessage('対戦を開始できません','相手の防衛データが削除・更新されたか、現在は挑戦できない状態です。ランキングを更新してください。');return;}else pool=[];}
+  if(onlineTarget){var proof=await beginServerPvpMatch(onlineTarget);if(proof){onlineTarget=Object.assign({},onlineTarget,{matchId:proof.match_id,proofToken:proof.proof_token});state.pvp.activeMatchId=proof.match_id;state.pvpTarget=onlineTarget;}else if(explicit){showMessage('対戦を開始できません','PVP検証用SQLが未導入、相手の防衛データが更新された、または現在は挑戦できない状態です。');return;}else pool=[];}
   if(!pool.length){if(!ARENA_BOT_MODE){showMessage('アリーナ','オンライン対戦相手がまだ登録されていません。');return;}ensureBots();var pp2=playerPower();var sorted=state.bots.slice().sort(function(a,b){return Math.abs(a.power-pp2)-Math.abs(b.power-pp2);});state.pvpTarget=sorted[Math.floor(Math.random()*3)]||sorted[0];}
   startBattle('pvp');
  }finally{pvpMatchBusy=false;}
@@ -1453,6 +1456,7 @@ if(cost>0){if(state.stamina<cost){showMessage('スタミナ不足','スタミナ
 var enemy=makeEnemy(type,rivalId);
 state.battle={enemy:enemy,type:type,terrain:pick(TERRAINS),gateName:enemy.gateName,gateEx:!!enemy.gateEx,over:false,defend:false,
 abilityCd:0,cds:{},pbuffs:{},edebuffs:{},nullGuard:false,guardCounter:0,sureDodge:0,reflect:0,firstStrike:false,res:0,potionUsed:false,telegraph:null,telegraphCd:0};
+if(type==='pvp'&&enemy.online&&enemy.matchId)state.battle.pvpAudit={startedAt:Date.now(),actions:0,attackerStartHp:getStats().hp,defenderStartHp:enemy.maxhp};
 document.getElementById('battleLog').innerHTML='';
 addLog('【戦場：'+state.battle.terrain+'】','important',true);addLog(tLine(),'normal');
 addLog(eLine('in')||('敵：'+enemy.name+'が'+pick(['低く身を伏せた','影から現れた','空気を震わせて立っている'])+'。'),'enemy');
@@ -1607,6 +1611,7 @@ if(s.sureDodge){b.sureDodge=1;addLog('次の一手が、すでに視えている
 if(s.reflect){b.reflect=s.reflect;addLog('次の被ダメージを'+s.reflect+'%返す構えを取った。','skill');}
 finishPlayerTurn();}
 function playerAction(type){var b=state.battle;if(!b||b.over)return;
+if(b.pvpAudit)b.pvpAudit.actions=Math.min(300,(b.pvpAudit.actions||0)+1);
 if(type==='ability'&&b.abilityCd>0)return;
 beginPlayerAction();
 b.defend=false;
