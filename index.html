@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>異能ゲート・クロニクル v39</title>
+<title>異能ゲート・クロニクル v40</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b0b10;color:#e8e6f0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;line-height:1.5}
 #app{max-width:760px;margin:0 auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom))}
@@ -44,7 +44,7 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 <body>
 <div id="app">
 <section id="startScreen">
-<h1>異能ゲート・クロニクル <span class="small">v39</span></h1>
+<h1>異能ゲート・クロニクル <span class="small">v40</span></h1>
 <div class="card"><h2>キャラクター作成</h2>
 <p class="small">名前を入力し、10種の初期異能から1つ選択してください。世界には、条件を満たした者だけが発見できる5つの隠し異能も存在します。</p>
 <input id="playerNameInput" type="text" maxlength="12" placeholder="名前を入力" style="width:100%;font-size:18px;padding:12px;border-radius:12px;border:1px solid #444;background:#0d0d13;color:#fff;margin-bottom:6px;"></div>
@@ -107,7 +107,7 @@ var SAVE_KEY='ign_save_v1';
 var BACKUP_KEY='ign_save_backups_v1';
 var CLOUD_GAME_ID='inou_chronicle';
 var PVP_DATA_VERSION=2;
-var CLIENT_BUILD_VERSION=39;
+var CLIENT_BUILD_VERSION=40;
 var PVP_DAILY_LIMIT=5;
 var PVP_SEASON_ID='preseason-1';
 var SUPABASE_URL='https://ybbolpaerkhozzxlsvag.supabase.co';
@@ -1479,15 +1479,28 @@ async function startPvp(targetUserId){
   if(pvpDailyRemaining<=0){showMessage('本日の対戦回数を使い切りました','アリーナは1日'+PVP_DAILY_LIMIT+'回までです。<br>日本時間0時に回復します。<br><br>探索スタミナは消費しません。');return;}
   if(pvpOnlineProfiles.length===0&&!pvpOnlineLoading)await fetchPvpProfiles(false);
   var pool=pvpOnlineProfiles.slice();
-  var explicit=!!targetUserId,onlineTarget=null;
+  var explicit=!!targetUserId,onlineTarget=null,proof=null;
+  state.pvpTarget=null;
   if(explicit){
    onlineTarget=pool.find(function(p){return p.userId===targetUserId;});
    if(!onlineTarget){showMessage('対戦相手が見つかりません','ランキングを更新してから、もう一度相手を選んでください。');return;}
    if(!safeConfirm(onlineTarget.name+'へ挑戦しますか？\n\n戦闘力 '+onlineTarget.power+' / Rate '+onlineTarget.rating+'\n本日の残り '+pvpDailyRemaining+'回（スタミナ消費なし）'))return;
+   proof=await beginServerPvpMatch(onlineTarget);
+   if(!proof){var explicitMsg=pvpStartError.indexOf('OPPONENT_DAILY_LIMIT')>=0?'同じ相手には1日3回まで挑戦できます。対戦ボタンの自動選択なら、別の相手またはBOTと戦えます。':pvpStartError.indexOf('DAILY_MATCH_LIMIT')>=0?'本日の5回を使い切りました。日本時間0時に回復します。':'v39 SQLが未導入、相手の防衛データが更新された、または現在は挑戦できない状態です。';showMessage('対戦を開始できません',explicitMsg);return;}
   }else if(pool.length){
-   var pp=playerPower();pool.sort(function(a,b){return Math.abs(a.power-pp)-Math.abs(b.power-pp);});onlineTarget=pool[Math.floor(Math.random()*Math.min(3,pool.length))]||pool[0];
+   var pp=playerPower(),candidates=pool.slice().sort(function(a,b){return Math.abs(a.power-pp)-Math.abs(b.power-pp);});
+   while(candidates.length&&!proof){
+    var pickIndex=Math.floor(Math.random()*Math.min(3,candidates.length));
+    onlineTarget=candidates.splice(pickIndex,1)[0];
+    proof=await beginServerPvpMatch(onlineTarget);
+    if(proof)break;
+    if(pvpStartError.indexOf('OPPONENT_DAILY_LIMIT')>=0)continue;
+    if(pvpStartError.indexOf('DAILY_MATCH_LIMIT')>=0){showMessage('本日の対戦回数を使い切りました','日本時間0時に回復します。');return;}
+    showMessage('対戦を開始できません','サーバー通信、相手の防衛データ、またはv39 SQLを確認してください。');return;
+   }
+   if(!proof)pool=[];
   }
-  if(onlineTarget){var proof=await beginServerPvpMatch(onlineTarget);if(proof){onlineTarget=Object.assign({},onlineTarget,{matchId:proof.match_id,proofToken:proof.proof_token});state.pvp.activeMatchId=proof.match_id;state.pvpTarget=onlineTarget;}else{var limitMsg=pvpStartError.indexOf('OPPONENT_DAILY_LIMIT')>=0?'同じ相手には1日3回まで挑戦できます。':pvpStartError.indexOf('DAILY_MATCH_LIMIT')>=0?'本日の5回を使い切りました。日本時間0時に回復します。':'v39 SQLが未導入、相手の防衛データが更新された、または現在は挑戦できない状態です。';showMessage('対戦を開始できません',limitMsg);return;}}
+  if(proof){onlineTarget=Object.assign({},onlineTarget,{matchId:proof.match_id,proofToken:proof.proof_token});state.pvp.activeMatchId=proof.match_id;state.pvpTarget=onlineTarget;}
   if(!pool.length){if(!ARENA_BOT_MODE){showMessage('アリーナ','オンライン対戦相手がまだ登録されていません。');return;}if(!(await consumeBotPvpAttempt())){showMessage('BOT戦を開始できません',pvpStartError.indexOf('DAILY_MATCH_LIMIT')>=0?'本日の5回を使い切りました。日本時間0時に回復します。':'回数を確認できませんでした。通信状態またはv39 SQLを確認してください。');return;}ensureBots();var pp2=playerPower();var sorted=state.bots.slice().sort(function(a,b){return Math.abs(a.power-pp2)-Math.abs(b.power-pp2);});state.pvpTarget=sorted[Math.floor(Math.random()*3)]||sorted[0];}
   startBattle('pvp');
  }finally{pvpMatchBusy=false;}
