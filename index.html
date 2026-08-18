@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>異能ゲート・クロニクル v33</title>
+<title>異能ゲート・クロニクル v34</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b0b10;color:#e8e6f0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;line-height:1.5}
 #app{max-width:760px;margin:0 auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom))}
@@ -44,7 +44,7 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 <body>
 <div id="app">
 <section id="startScreen">
-<h1>異能ゲート・クロニクル <span class="small">v33</span></h1>
+<h1>異能ゲート・クロニクル <span class="small">v34</span></h1>
 <div class="card"><h2>キャラクター作成</h2>
 <p class="small">名前を入力し、10種の初期異能から1つ選択してください。世界には、条件を満たした者だけが発見できる5つの隠し異能も存在します。</p>
 <input id="playerNameInput" type="text" maxlength="12" placeholder="名前を入力" style="width:100%;font-size:18px;padding:12px;border-radius:12px;border:1px solid #444;background:#0d0d13;color:#fff;margin-bottom:6px;"></div>
@@ -1070,6 +1070,22 @@ async function logoutCloud(removeLocal){
   location.reload();
  }catch(e){logError(e);showMessage('ログアウト失敗','通信状態を確認して、もう一度お試しください。');}
 }
+async function deleteCloudAccount(){
+ if(!cloudReady||!cloudClient||!cloudUser||cloudIsAnonymous()){showMessage('削除できません','先にメール連携済みアカウントへログインしてください。');return;}
+ var typed=accountInput('deleteAccountConfirm');
+ var expected=cloudUser.email||'';
+ if(!expected||typed.toLowerCase()!==expected.toLowerCase()){showMessage('入力確認','確認欄へ、現在のメールアドレスを正確に入力してください。');return;}
+ if(!safeConfirm('アカウントを完全に削除しますか？\n\nクラウドセーブ・PVP防衛データ・戦績は削除され、元に戻せません。'))return;
+ if(!safeConfirm('最終確認です。端末データも含めて完全に削除します。よろしいですか？'))return;
+ try{
+  cloudSetStatus('アカウント削除中…');
+  var res=await cloudClient.rpc('delete_my_account');if(res.error)throw res.error;
+  try{await cloudClient.auth.signOut({scope:'local'});}catch(ignore){}
+  localStorage.removeItem(SAVE_KEY);localStorage.removeItem(BACKUP_KEY);
+  showMessage('アカウント削除完了','クラウドと端末のデータを削除しました。<br><br>閉じると最初の画面へ戻ります。');
+  setTimeout(function(){location.reload();},1200);
+ }catch(e){logError(e);cloudSetStatus('アカウント削除失敗');showMessage('アカウント削除失敗','削除用サーバー設定が未導入、または通信に失敗した可能性があります。端末データは削除していません。');}
+}
 async function cloudForceOverwrite(){
  if(!state||!cloudUser)return;if(!safeConfirm('クラウドの既存データを、この端末データで上書きしますか？'))return;
  if(cloudRemoteSave&&cloudRemoteSave.save_data)storeRecoveryBackup(cloudRemoteSave.save_data,'端末データで上書きする前のクラウドデータ');
@@ -1102,7 +1118,7 @@ if(oldVersion<24){var rarityMap=[0,2,4,6];
 s.inventory.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});
 s.equipment.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});}
 if(oldVersion<33){s.inventory.concat(s.equipment).forEach(function(it){if(!it||it.reqLv==null)return;var cap=(REQ_BASE[it.rank]||1)+Math.floor((Number(it.rarity)||0)/3)+2;it.reqLv=Math.max(1,Math.min(Number(it.reqLv)||1,Math.min(100,cap)));});}
-s.dataVersion=33;
+s.dataVersion=34;
 s.currentGateIndex=clamp(s.currentGateIndex||0,0,GATES.length-1);s.pendingSkills=s.pendingSkills||[];s.battle=null;s.auto=false;s.debugGates=s.debugGates||false;
 s.stamina=s.stamina==null?100:s.stamina;s.staminaTs=s.staminaTs||serverTime();s.arenaPts=s.arenaPts||0;s.playerId=s.playerId||makeId();
 s.learned=s.learned||{first:[],second:[],integrated:[]};s.skillDone=s.skillDone||{first:[],second:[],integrated:[]};
@@ -1199,7 +1215,7 @@ if(!name){showMessage('名前未入力','キャラクター名を入力してく
 if(!selectedAbility){showMessage('異能未選択','リストから初期異能を1つ選択してください。');return;}
 if(hasSave()&&!safeConfirm('既存のセーブデータを上書きして新しく始めますか？'))return;
 tierCache={};
-state={dataVersion:33,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
+state={dataVersion:34,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
 alloc:{str:0,vit:0,def:0,agi:0,pow:0},currentGateIndex:0,stamina:100,staminaTs:serverTime(),hpTs:serverTime(),arenaPts:0,playerId:makeId(),auto:false,debugGates:false,
 learned:{first:[],second:[],integrated:[]},skillDone:{first:[],second:[],integrated:[]},
 inventory:[],equipment:[null,null,null],tut:{battles:0,gotItem:false,guideDone:false},frags:{},carriedSkills:[],abilityHistory:[],abilityMastery:{},abilityAcquired:{},titles:[],activeTitle:null,gold:CONFIG.START_GOLD,potions:CONFIG.START_POTIONS,iap:{noAds:false,passUntil:0},gateProgress:{},absorbed:[],pendingSkills:[],battle:null,bots:null,pvpTarget:null,pvp:{dataVersion:PVP_DATA_VERSION,seasonId:PVP_SEASON_ID,rating:1000,seasonPoints:0,wins:0,losses:0,defenseWins:0,defenseLosses:0,winStreak:0,bestRating:1000,aiStyle:'balanced',defenseSnapshot:null,lastSnapshotAt:null,lastMatchAt:null,activeMatchId:null,lastResultText:''},unlockedHidden:[],hiddenNotices:[],storySeen:{},storyNotices:[],totalWins:0};
@@ -1771,7 +1787,7 @@ function renderAccountCardHtml(){
  var inputStyle='width:100%;font-size:16px;padding:12px;border-radius:10px;border:1px solid #444;background:#0d0d13;color:#fff;margin:8px 0;';
  var h='<div class="card"><h3 style="margin-top:0;">アカウント・引き継ぎ</h3><div class="small" style="color:#8fe3ff;">'+cloudAccountText()+'</div>';
  if(!cloudReady)return h+'<div class="small" style="margin-top:8px;">現在はオフラインです。端末内セーブは利用できます。</div></div>';
- if(!cloudIsAnonymous())return h+'<div class="small" style="margin-top:8px;">別のiPhoneやPCでは、下の「ログインリンクを送る」から同じメールアドレスでログインできます。</div><input id="loginEmail" type="email" autocomplete="email" placeholder="登録済みメールアドレス" style="'+inputStyle+'"><button style="width:100%;" onclick="sendCloudLoginLink()">ログインリンクを送る</button><hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;"><strong>メールアドレス変更</strong><input id="changeEmail" type="email" autocomplete="email" placeholder="新しいメールアドレス" style="'+inputStyle+'"><button style="width:100%;" onclick="changeCloudEmail()">変更確認メールを送る</button><hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;"><strong>ログアウト</strong><div class="small" style="margin:6px 0 8px;">ログアウト前にクラウド保存を確認します。</div><button style="width:100%;margin-bottom:8px;" onclick="logoutCloud(false)">ログアウト（端末データを残す）</button><button class="danger" style="width:100%;" onclick="logoutCloud(true)">ログアウトして端末データも削除</button></div>';
+ if(!cloudIsAnonymous())return h+'<div class="small" style="margin-top:8px;">別のiPhoneやPCでは、下の「ログインリンクを送る」から同じメールアドレスでログインできます。</div><input id="loginEmail" type="email" autocomplete="email" placeholder="登録済みメールアドレス" style="'+inputStyle+'"><button style="width:100%;" onclick="sendCloudLoginLink()">ログインリンクを送る</button><hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;"><strong>メールアドレス変更</strong><input id="changeEmail" type="email" autocomplete="email" placeholder="新しいメールアドレス" style="'+inputStyle+'"><button style="width:100%;" onclick="changeCloudEmail()">変更確認メールを送る</button><hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;"><strong>ログアウト</strong><div class="small" style="margin:6px 0 8px;">ログアウト前にクラウド保存を確認します。</div><button style="width:100%;margin-bottom:8px;" onclick="logoutCloud(false)">ログアウト（端末データを残す）</button><button class="danger" style="width:100%;" onclick="logoutCloud(true)">ログアウトして端末データも削除</button><hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;"><strong style="color:#ff8ca1;">アカウント完全削除</strong><div class="small" style="margin:6px 0 8px;">クラウドセーブ・PVP防衛データ・戦績・端末データを削除します。取り消せません。</div><input id="deleteAccountConfirm" type="email" autocomplete="off" placeholder="現在のメールアドレスを入力" style="'+inputStyle+'"><button class="danger" style="width:100%;" onclick="deleteCloudAccount()">アカウントを完全に削除</button></div>';
  return h+'<div class="small" style="margin-top:8px;">現在のゲストデータをメールアドレスへ連携します。確認メール内のリンクを押すと登録完了です。</div><input id="linkEmail" type="email" autocomplete="email" placeholder="連携するメールアドレス" style="'+inputStyle+'"><button class="primary" style="width:100%;" onclick="linkCloudEmail()">このセーブをメール連携</button><hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;"><div class="small">すでに別端末で登録済みの場合</div><input id="loginEmail" type="email" autocomplete="email" placeholder="登録済みメールアドレス" style="'+inputStyle+'"><button style="width:100%;" onclick="sendCloudLoginLink()">ログインリンクを送る</button></div>';
 }
 function renderStatus(){var st=getStats();var a=state.alloc;
