@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>異能ゲート・クロニクル v35</title>
+<title>異能ゲート・クロニクル v36</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b0b10;color:#e8e6f0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;line-height:1.5}
 #app{max-width:760px;margin:0 auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom))}
@@ -44,7 +44,7 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 <body>
 <div id="app">
 <section id="startScreen">
-<h1>異能ゲート・クロニクル <span class="small">v35</span></h1>
+<h1>異能ゲート・クロニクル <span class="small">v36</span></h1>
 <div class="card"><h2>キャラクター作成</h2>
 <p class="small">名前を入力し、10種の初期異能から1つ選択してください。世界には、条件を満たした者だけが発見できる5つの隠し異能も存在します。</p>
 <input id="playerNameInput" type="text" maxlength="12" placeholder="名前を入力" style="width:100%;font-size:18px;padding:12px;border-radius:12px;border:1px solid #444;background:#0d0d13;color:#fff;margin-bottom:6px;"></div>
@@ -1119,7 +1119,7 @@ if(oldVersion<24){var rarityMap=[0,2,4,6];
 s.inventory.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});
 s.equipment.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});}
 if(oldVersion<33){s.inventory.concat(s.equipment).forEach(function(it){if(!it||it.reqLv==null)return;var cap=(REQ_BASE[it.rank]||1)+Math.floor((Number(it.rarity)||0)/3)+2;it.reqLv=Math.max(1,Math.min(Number(it.reqLv)||1,Math.min(100,cap)));});}
-s.dataVersion=35;
+s.dataVersion=36;
 s.currentGateIndex=clamp(s.currentGateIndex||0,0,GATES.length-1);s.pendingSkills=s.pendingSkills||[];s.battle=null;s.auto=false;s.debugGates=s.debugGates||false;
 s.stamina=s.stamina==null?100:s.stamina;s.staminaTs=s.staminaTs||serverTime();s.arenaPts=s.arenaPts||0;s.playerId=s.playerId||makeId();
 s.learned=s.learned||{first:[],second:[],integrated:[]};s.skillDone=s.skillDone||{first:[],second:[],integrated:[]};
@@ -1240,7 +1240,7 @@ if(!name){showMessage('名前未入力','キャラクター名を入力してく
 if(!selectedAbility){showMessage('異能未選択','リストから初期異能を1つ選択してください。');return;}
 if(hasSave()&&!safeConfirm('既存のセーブデータを上書きして新しく始めますか？'))return;
 tierCache={};
-state={dataVersion:35,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
+state={dataVersion:36,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
 alloc:{str:0,vit:0,def:0,agi:0,pow:0},currentGateIndex:0,stamina:100,staminaTs:serverTime(),hpTs:serverTime(),arenaPts:0,playerId:makeId(),auto:false,debugGates:false,
 learned:{first:[],second:[],integrated:[]},skillDone:{first:[],second:[],integrated:[]},
 inventory:[],equipment:[null,null,null],tut:{battles:0,gotItem:false,guideDone:false},frags:{},carriedSkills:[],abilityHistory:[],abilityMastery:{},abilityAcquired:{},titles:[],activeTitle:null,gold:CONFIG.START_GOLD,potions:CONFIG.START_POTIONS,iap:{noAds:false,passUntil:0},gateProgress:{},absorbed:[],pendingSkills:[],battle:null,bots:null,pvpTarget:null,pvp:{dataVersion:PVP_DATA_VERSION,seasonId:PVP_SEASON_ID,rating:1000,seasonPoints:0,wins:0,losses:0,defenseWins:0,defenseLosses:0,winStreak:0,bestRating:1000,aiStyle:'balanced',defenseSnapshot:null,lastSnapshotAt:null,lastMatchAt:null,activeMatchId:null,lastResultText:''},unlockedHidden:[],hiddenNotices:[],storySeen:{},storyNotices:[],totalWins:0};
@@ -1424,12 +1424,20 @@ var atk=ss&&Number(ss.atk)>0?Math.floor(Number(ss.atk)):Math.floor(p*0.10+8),def
 if(style==='aggressive'){atk=Math.floor(atk*1.10);def=Math.max(1,Math.floor(def*0.95));}else if(style==='defensive'){atk=Math.max(1,Math.floor(atk*0.92));def=Math.floor(def*1.15);}
 return{name:'【アリーナ】'+(bot?bot.name:'???'),type:'pvp',fxKey:'__arena',rivalId:null,isBoss:true,hp:hp,maxhp:hp,
 atk:atk,def:def,crit:ss?Number(ss.crit)||12:12,dodge:ss?Number(ss.dodge)||10:10,speed:ss?Number(ss.speed)||12:12+Math.floor(p/300),burn:0,stun:0,online:!!(bot&&bot.online),opponentUserId:bot&&bot.userId||null,opponentRating:bot&&bot.rating||1000,aiStyle:style,matchId:bot&&bot.matchId||null};}
-async function startPvp(){
+async function startPvp(targetUserId){
  if(pvpMatchBusy||pvpResultBusy)return;if(state.pendingSkills.length){processPendingSkills();return;}if(state.battle&&!state.battle.over){switchTab('battle');return;}if(state.stamina<COST.pvp){showMessage('スタミナ不足','スタミナ'+COST.pvp+'必要。時間回復または広告で回復できます。');return;}
  pvpMatchBusy=true;try{
   if(pvpOnlineProfiles.length===0&&!pvpOnlineLoading)await fetchPvpProfiles(false);
   var pool=pvpOnlineProfiles.slice();
-  if(pool.length){var pp=playerPower();pool.sort(function(a,b){return Math.abs(a.power-pp)-Math.abs(b.power-pp);});var onlineTarget=pool[Math.floor(Math.random()*Math.min(3,pool.length))]||pool[0];var matchId=await beginServerPvpMatch(onlineTarget);if(matchId){onlineTarget.matchId=matchId;state.pvp.activeMatchId=matchId;state.pvpTarget=onlineTarget;}else pool=[];}
+  var explicit=!!targetUserId,onlineTarget=null;
+  if(explicit){
+   onlineTarget=pool.find(function(p){return p.userId===targetUserId;});
+   if(!onlineTarget){showMessage('対戦相手が見つかりません','ランキングを更新してから、もう一度相手を選んでください。');return;}
+   if(!safeConfirm(onlineTarget.name+'へ挑戦しますか？\n\n戦闘力 '+onlineTarget.power+' / Rate '+onlineTarget.rating+'\nスタミナ '+COST.pvp+'消費'))return;
+  }else if(pool.length){
+   var pp=playerPower();pool.sort(function(a,b){return Math.abs(a.power-pp)-Math.abs(b.power-pp);});onlineTarget=pool[Math.floor(Math.random()*Math.min(3,pool.length))]||pool[0];
+  }
+  if(onlineTarget){var matchId=await beginServerPvpMatch(onlineTarget);if(matchId){onlineTarget=Object.assign({},onlineTarget,{matchId:matchId});state.pvp.activeMatchId=matchId;state.pvpTarget=onlineTarget;}else if(explicit){showMessage('対戦を開始できません','相手の防衛データが削除・更新されたか、現在は挑戦できない状態です。ランキングを更新してください。');return;}else pool=[];}
   if(!pool.length){if(!ARENA_BOT_MODE){showMessage('アリーナ','オンライン対戦相手がまだ登録されていません。');return;}ensureBots();var pp2=playerPower();var sorted=state.bots.slice().sort(function(a,b){return Math.abs(a.power-pp2)-Math.abs(b.power-pp2);});state.pvpTarget=sorted[Math.floor(Math.random()*3)]||sorted[0];}
   startBattle('pvp');
  }finally{pvpMatchBusy=false;}
@@ -2001,8 +2009,8 @@ if(mi.reward.exp){var re=Math.round(mi.reward.exp*bm);gainExp(re);got.push('経�
 if(mi.reward.potion){var pn=Math.round(mi.reward.potion*bm);state.potions=(state.potions||0)+pn;got.push(POTION.name+'×'+pn);}
 if(mi.reward.item){var it=makeItem(getCurrentGate(),true,mi.reward.item);addItem(it,true);got.push('【'+RARITIES[it.rarity].n+'】'+it.name);}
 renderAll();showMessage('ミッション達成',mi.name+'<br><br>受け取り：'+got.join(' / '));}
-function renderRanking(){ensureBots();var src=pvpOnlineProfiles.length?pvpOnlineProfiles:(state.bots||[]);var rows=src.map(function(b){return{name:b.name,power:b.power,rating:b.rating||1000,online:!!b.online,me:false};}).concat([{name:state.name,power:playerPower(),rating:state.pvp.rating||1000,online:pvpOnlineProfiles.length>0,me:true}]).sort(function(a,b){return a.online||b.online?(b.rating-a.rating)||(b.power-a.power):b.power-a.power;}).slice(0,10);
-return rows.map(function(r,i){return '<div class="item-row"><div class="item-info">'+(i+1)+'. <span style="'+(r.me?'color:#ffd76b;font-weight:700':'')+'">'+cloudEsc(r.name)+(r.me?'(あなた)':'')+'</span><div class="small">戦力 '+r.power+(r.online?' / Rate '+r.rating:' / BOT')+'</div></div></div>';}).join('');}
+function renderRanking(){ensureBots();var src=pvpOnlineProfiles.length?pvpOnlineProfiles:(state.bots||[]);var rows=src.map(function(b){return{userId:b.userId||'',name:b.name,power:b.power,rating:b.rating||1000,online:!!b.online,me:false};}).concat([{userId:'',name:state.name,power:playerPower(),rating:state.pvp.rating||1000,online:pvpOnlineProfiles.length>0,me:true}]).sort(function(a,b){return a.online||b.online?(b.rating-a.rating)||(b.power-a.power):b.power-a.power;}).slice(0,10);
+return rows.map(function(r,i){var challenge=r.online&&!r.me?'<button class="primary" onclick="startPvp(\''+cloudEsc(r.userId)+'\')" '+((pvpMatchBusy||pvpResultBusy||(state.battle&&!state.battle.over))?'disabled':'')+'>挑戦</button>':'';return '<div class="item-row"><div class="item-info">'+(i+1)+'. <span style="'+(r.me?'color:#ffd76b;font-weight:700':'')+'">'+cloudEsc(r.name)+(r.me?'(あなた)':'')+'</span><div class="small">戦力 '+r.power+(r.online?' / Rate '+r.rating:' / BOT')+'</div></div>'+challenge+'</div>';}).join('');}
 function renderDaily(){regenStamina();var d=state.daily;var w=state.world;
 if(WORLD_BOSS_SIMULATION){w.hp=worldHp();}
 var inBattle=state.battle&&!state.battle.over;
