@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>異能ゲート・クロニクル v32</title>
+<title>異能ゲート・クロニクル v33</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b0b10;color:#e8e6f0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;line-height:1.5}
 #app{max-width:760px;margin:0 auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom))}
@@ -44,7 +44,7 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 <body>
 <div id="app">
 <section id="startScreen">
-<h1>異能ゲート・クロニクル <span class="small">v32</span></h1>
+<h1>異能ゲート・クロニクル <span class="small">v33</span></h1>
 <div class="card"><h2>キャラクター作成</h2>
 <p class="small">名前を入力し、10種の初期異能から1つ選択してください。世界には、条件を満たした者だけが発見できる5つの隠し異能も存在します。</p>
 <input id="playerNameInput" type="text" maxlength="12" placeholder="名前を入力" style="width:100%;font-size:18px;padding:12px;border-radius:12px;border:1px solid #444;background:#0d0d13;color:#fff;margin-bottom:6px;"></div>
@@ -1096,12 +1096,13 @@ function migratePvpState(s){
 }
 function normalizeEquipmentTypes(s){if(!s)return;s.inventory=s.inventory||[];s.equipment=s.equipment||[];var all=s.equipment.filter(Boolean),ordered=[null,null,null],slot={weapon:0,armor:1,accessory:2};
 all.forEach(function(it){var n=slot[it.type];if(n==null||ordered[n])s.inventory.push(it);else ordered[n]=it;});s.equipment=ordered;}
-function migrate(s){s.statPoints=s.statPoints||0;s.alloc=Object.assign({str:0,vit:0,def:0,agi:0,pow:0},s.alloc||{});
+function migrate(s){var oldVersion=s.dataVersion||0;s.statPoints=s.statPoints||0;s.alloc=Object.assign({str:0,vit:0,def:0,agi:0,pow:0},s.alloc||{});
 s.inventory=s.inventory||[];s.equipment=s.equipment||[null,null];
-if((s.dataVersion||0)<24){var rarityMap=[0,2,4,6];
+if(oldVersion<24){var rarityMap=[0,2,4,6];
 s.inventory.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});
 s.equipment.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});}
-s.dataVersion=32;
+if(oldVersion<33){s.inventory.concat(s.equipment).forEach(function(it){if(!it||it.reqLv==null)return;var cap=(REQ_BASE[it.rank]||1)+Math.floor((Number(it.rarity)||0)/3)+2;it.reqLv=Math.max(1,Math.min(Number(it.reqLv)||1,Math.min(100,cap)));});}
+s.dataVersion=33;
 s.currentGateIndex=clamp(s.currentGateIndex||0,0,GATES.length-1);s.pendingSkills=s.pendingSkills||[];s.battle=null;s.auto=false;s.debugGates=s.debugGates||false;
 s.stamina=s.stamina==null?100:s.stamina;s.staminaTs=s.staminaTs||serverTime();s.arenaPts=s.arenaPts||0;s.playerId=s.playerId||makeId();
 s.learned=s.learned||{first:[],second:[],integrated:[]};s.skillDone=s.skillDone||{first:[],second:[],integrated:[]};
@@ -1198,7 +1199,7 @@ if(!name){showMessage('名前未入力','キャラクター名を入力してく
 if(!selectedAbility){showMessage('異能未選択','リストから初期異能を1つ選択してください。');return;}
 if(hasSave()&&!safeConfirm('既存のセーブデータを上書きして新しく始めますか？'))return;
 tierCache={};
-state={dataVersion:32,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
+state={dataVersion:33,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
 alloc:{str:0,vit:0,def:0,agi:0,pow:0},currentGateIndex:0,stamina:100,staminaTs:serverTime(),hpTs:serverTime(),arenaPts:0,playerId:makeId(),auto:false,debugGates:false,
 learned:{first:[],second:[],integrated:[]},skillDone:{first:[],second:[],integrated:[]},
 inventory:[],equipment:[null,null,null],tut:{battles:0,gotItem:false,guideDone:false},frags:{},carriedSkills:[],abilityHistory:[],abilityMastery:{},abilityAcquired:{},titles:[],activeTitle:null,gold:CONFIG.START_GOLD,potions:CONFIG.START_POTIONS,iap:{noAds:false,passUntil:0},gateProgress:{},absorbed:[],pendingSkills:[],battle:null,bots:null,pvpTarget:null,pvp:{dataVersion:PVP_DATA_VERSION,seasonId:PVP_SEASON_ID,rating:1000,seasonPoints:0,wins:0,losses:0,defenseWins:0,defenseLosses:0,winStreak:0,bestRating:1000,aiStyle:'balanced',defenseSnapshot:null,lastSnapshotAt:null,lastMatchAt:null,activeMatchId:null,lastResultText:''},unlockedHidden:[],hiddenNotices:[],storySeen:{},storyNotices:[],totalWins:0};
@@ -1699,7 +1700,7 @@ if(state.hp<=0){state.hp=0;defeat();}}
 function checkBattleEnd(){if(!state.battle)return true;if(state.battle.enemy.hp<=0){victory();return true;}if(state.hp<=0){defeat();return true;}return false;}
 function worldTimeDamage(){var w=state.world;var elH=(serverTime()-w.ts)/3600000;return elH*4.5;}
 function worldHp(){var w=state.world;return Math.max(0,Math.round(100-worldTimeDamage()-(w.contrib||0)));}
-function victory(){var b=state.battle;if(!b||b.over)return;b.over=true;var enemy=b.enemy;var gate=GATES.find(function(g){return g.name===b.gateName;})||getCurrentGate();
+function victory(){var b=state.battle;if(!b||b.over)return;b.over=true;var enemy=b.enemy;var gate=GATES.find(function(g){return g.name===b.gateName;})||getCurrentGate();var isPvp=enemy.type==='pvp';
 if(enemy.type!=='mob'){state.auto=false;stopAuto();}
 addLog(eLine('dead')||(enemy.name+'は静かに崩れ、ゲートの光へ還った。'),'important',true);
 var gateBonus=1+rankIndex(gate.rank)*0.15;var mult=EXP_TUNING.mobMult;
@@ -1707,11 +1708,11 @@ if(enemy.type==='boss')mult=EXP_TUNING.bossMult;
 if(enemy.type==='daily')mult=EXP_TUNING.bossMult*EXP_TUNING.dailyMult*dailyBonusMult();
 if(enemy.type==='world')mult=EXP_TUNING.bossMult*EXP_TUNING.worldMult;
 if(enemy.type==='rival'||enemy.type==='pvp')mult=EXP_TUNING.pvpMult;
-var exp=Math.floor((gate.exp/5+state.level*EXP_TUNING.levelCoef)*gateBonus*mult);
-addLog('経験値 +'+exp,'system');
-var gold=Math.floor((16+rankIndex(gate.rank)*9+state.level*0.8)*(enemy.isBoss?3:1)*(0.85+Math.random()*0.3)*(ECONOMY.goldPhase[state.phase]||1));
-gainGold(gold);
-if(gate.ex&&gate.setId){var setDef=LEGEND_SETS[gate.setId];
+var exp=isPvp?0:Math.floor((gate.exp/5+state.level*EXP_TUNING.levelCoef)*gateBonus*mult);
+if(!isPvp)addLog('経験値 +'+exp,'system');
+var gold=isPvp?0:Math.floor((16+rankIndex(gate.rank)*9+state.level*0.8)*(enemy.isBoss?3:1)*(0.85+Math.random()*0.3)*(ECONOMY.goldPhase[state.phase]||1));
+if(!isPvp)gainGold(gold);
+if(!isPvp&&gate.ex&&gate.setId){var setDef=LEGEND_SETS[gate.setId];
 var chance=setDef.drop*(enemy.isBoss?5:1);
 if(Math.random()<chance){var pi=Math.floor(Math.random()*setDef.pieces.length);
 if(ownsPiece(gate.setId,pi)){addFrags(gate.setId,FRAG.perDup);
@@ -1719,13 +1720,13 @@ addLog('【'+FRAG.name+'】すでに持つ部位だったため、'+FRAG.name+'�
 else{var lp=makeLegendPiece(gate.setId,pi);
 if(addItem(lp)){addLog('【レジェンドシリーズ】'+setDef.name+'シリーズ「'+lp.name+'」が落ちている。','crit',true);
 addLog(setDef.lore,'important');}}}}
-if(Math.random()<CONFIG.POTION_DROP*(enemy.isBoss?3:1)){var pd=enemy.isBoss?2:1;state.potions=(state.potions||0)+pd;addLog(POTION.name+' ×'+pd+' を拾った。','system');}
-state.tut=state.tut||{battles:0,gotItem:false};state.tut.battles++;
-if(!state.tut.gotItem){state.tut.gotItem=true;
+if(!isPvp&&Math.random()<CONFIG.POTION_DROP*(enemy.isBoss?3:1)){var pd=enemy.isBoss?2:1;state.potions=(state.potions||0)+pd;addLog(POTION.name+' ×'+pd+' を拾った。','system');}
+state.tut=state.tut||{battles:0,gotItem:false};if(!isPvp)state.tut.battles++;
+if(!isPvp&&!state.tut.gotItem){state.tut.gotItem=true;
 var first=makeItem(gate,false,1,1);first.reqLv=1;
 if(addItem(first))addLog('【初めての戦利品】'+RARITIES[first.rarity].n+' '+first.name+' を手に入れた。装備タブから装備できる。','crit',true);}
-else if(Math.random()<gate.itemRate||enemy.isBoss){var it=makeItem(gate,enemy.isBoss);if(addItem(it))addLog('アイテム「'+RARITIES[it.rarity].n+' '+it.name+'」（要Lv'+it.reqLv+'）を入手した。','important');}
-var m=state.daily.missions;m.wins++;if(['boss','daily','world'].indexOf(enemy.type)>=0)m.bosses++;
+else if(!isPvp&&(Math.random()<gate.itemRate||enemy.isBoss)){var it=makeItem(gate,enemy.isBoss);if(addItem(it))addLog('アイテム「'+RARITIES[it.rarity].n+' '+it.name+'」（要Lv'+it.reqLv+'）を入手した。','important');}
+var m=state.daily.missions;if(!isPvp)m.wins++;if(['boss','daily','world'].indexOf(enemy.type)>=0)m.bosses++;
 if(enemy.type==='mob'){var p=getGateProgress(gate);p.kills++;if(p.kills===gate.target)addLog('【ボス出現】必要討伐数に到達した。ゲートの奥で、強大な気配が目覚める。','important',true);}
 if(enemy.type==='boss'){var p2=getGateProgress(gate);p2.cleared=true;p2.clears=(p2.clears||0)+1;
 addLog('【ゲート完全クリア】'+gate.name+(gate.rank==='SSS'?'（通算 '+p2.clears+' 回）':''),'important',true);
@@ -1734,10 +1735,10 @@ addLog('遠くで、地図にない門が開く音がした。','important',true
 if(enemy.type==='daily'){state.daily.boss=true;var it2=makeItem(gate,true,4);addItem(it2);addLog('デイリー報酬：【'+RARITIES[it2.rarity].n+'】'+it2.name+' を獲得！','important',true);}
 if(enemy.type==='world'){state.world.contrib=(state.world.contrib||0)+5;state.world.hp=worldHp();
 if(state.world.hp<=0&&!state.world.rewarded){state.world.rewarded=true;var it3=makeItem(gate,true,5);addItem(it3);addLog('ワールドボス討伐！ 貢献報酬：【'+RARITIES[it3.rarity].n+'】'+it3.name+' 獲得！','important',true);}}
-if(enemy.type==='pvp'){state.arenaPts+=30;m.pvp++;addLog('アリーナ勝利！ Pt +30','system',true);if(enemy.online&&enemy.matchId){addLog('サーバーへ勝敗を送信している……','system');submitPvpResult(true,b);}}
+if(enemy.type==='pvp'){state.arenaPts+=30;m.pvp++;addLog('アリーナ勝利！ Pt +30','system',true);addLog('PVPでは経験値・ゴールド・通常装備は獲得しない。シーズン報酬へ集約される。','system');if(enemy.online&&enemy.matchId){addLog('サーバーへ勝敗を送信している……','system');submitPvpResult(true,b);}}
 if(enemy.type==='rival')absorbAbility(enemy.rivalId);
-state.totalWins=(state.totalWins||0)+1;
-gainExp(exp);state.hp=Math.min(getStats().hp,state.hp+Math.floor(getStats().hp*0.12));renderAll();}
+if(!isPvp)state.totalWins=(state.totalWins||0)+1;
+if(exp>0)gainExp(exp);state.hp=Math.min(getStats().hp,state.hp+Math.floor(getStats().hp*0.12));renderAll();}
 function defeat(){var b=state.battle;if(!b||b.over)return;b.over=true;state.auto=false;stopAuto();
 if(b.type==='pvp'){state.arenaPts+=5;addLog('アリーナ敗北……Pt +5','system');if(b.enemy.online&&b.enemy.matchId){addLog('サーバーへ勝敗を送信している……','system');submitPvpResult(false,b);}}
 addLog('視界が赤く染まる……だが、ステータスウィンドウが再構成を促している。','important',true);
@@ -1851,7 +1852,7 @@ var type=pick(['weapon','armor','accessory']);var base=pick(EQUIP_NAMES[type]);v
 var reqBase=REQ_BASE[g.rank]||1;
 var quality=0.92+Math.random()*0.17;
 var it={id:Date.now()+Math.random(),name:base+'・'+g.rank,type:type,typeLabel:TYPE_LABEL[type],rarity:r,rank:g.rank,locked:false,quality:quality,
-reqLv:clamp(Math.round(reqBase+r*4+(isBoss?3:0)+Math.floor(Math.random()*3)),1,100),atk:0,def:0,hp:0,crit:0,dodge:0};
+reqLv:clamp(reqBase+Math.floor(r/3)+(isBoss?1:0)+Math.floor(Math.random()*2),1,100),atk:0,def:0,hp:0,crit:0,dodge:0};
 if(type==='weapon'){it.atk=Math.floor((5+ri*4+(isBoss?6:0))*R.m*quality);if(Math.random()<.3)it.crit=Math.floor((2+ri)*R.m*quality);}
 else if(type==='armor'){it.def=Math.floor((4+ri*4+(isBoss?5:0))*R.m*quality);it.hp=Math.floor((20+ri*12+(isBoss?20:0))*R.m*quality);}
 else{if(Math.random()<.5)it.crit=Math.floor((3+ri*2)*R.m*quality);else it.dodge=Math.floor((3+ri*2)*R.m*quality);if(isBoss)it.hp=Math.floor((15+ri*5)*R.m*quality);}
