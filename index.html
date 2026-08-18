@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>異能ゲート・クロニクル v34</title>
+<title>異能ゲート・クロニクル v35</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b0b10;color:#e8e6f0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;line-height:1.5}
 #app{max-width:760px;margin:0 auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom))}
@@ -44,7 +44,7 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 <body>
 <div id="app">
 <section id="startScreen">
-<h1>異能ゲート・クロニクル <span class="small">v34</span></h1>
+<h1>異能ゲート・クロニクル <span class="small">v35</span></h1>
 <div class="card"><h2>キャラクター作成</h2>
 <p class="small">名前を入力し、10種の初期異能から1つ選択してください。世界には、条件を満たした者だけが発見できる5つの隠し異能も存在します。</p>
 <input id="playerNameInput" type="text" maxlength="12" placeholder="名前を入力" style="width:100%;font-size:18px;padding:12px;border-radius:12px;border:1px solid #444;background:#0d0d13;color:#fff;margin-bottom:6px;"></div>
@@ -113,6 +113,7 @@ var cloudClient=null,cloudUser=null,cloudReady=false,cloudBusy=false,cloudTimer=
 var cloudStatus='接続準備中',cloudLastSavedAt=null,cloudRemoteSave=null,cloudRemoteChecked=false,cloudAuthListenerBound=false;
 var pvpOnlineProfiles=[],pvpOnlineLoading=false,pvpOnlineStatus='未取得';
 var pvpResultBusy=false,pvpMatchBusy=false;
+var pvpMatchHistory=[],pvpHistoryLoading=false,pvpHistoryStatus='未取得';
 function serverTime(){return Date.now();}
 function iap(){if(!state)return{noAds:false,passUntil:0};if(!state.iap)state.iap={noAds:false,passUntil:0};return state.iap;}
 function hasNoAds(){return!!iap().noAds;}
@@ -1118,7 +1119,7 @@ if(oldVersion<24){var rarityMap=[0,2,4,6];
 s.inventory.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});
 s.equipment.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});}
 if(oldVersion<33){s.inventory.concat(s.equipment).forEach(function(it){if(!it||it.reqLv==null)return;var cap=(REQ_BASE[it.rank]||1)+Math.floor((Number(it.rarity)||0)/3)+2;it.reqLv=Math.max(1,Math.min(Number(it.reqLv)||1,Math.min(100,cap)));});}
-s.dataVersion=34;
+s.dataVersion=35;
 s.currentGateIndex=clamp(s.currentGateIndex||0,0,GATES.length-1);s.pendingSkills=s.pendingSkills||[];s.battle=null;s.auto=false;s.debugGates=s.debugGates||false;
 s.stamina=s.stamina==null?100:s.stamina;s.staminaTs=s.staminaTs||serverTime();s.arenaPts=s.arenaPts||0;s.playerId=s.playerId||makeId();
 s.learned=s.learned||{first:[],second:[],integrated:[]};s.skillDone=s.skillDone||{first:[],second:[],integrated:[]};
@@ -1183,6 +1184,30 @@ async function fetchPvpProfiles(showResult){
  finally{pvpOnlineLoading=false;if(currentTab==='daily')renderDaily();}
  return pvpOnlineProfiles;
 }
+async function fetchPvpHistory(showResult){
+ if(pvpHistoryLoading)return pvpMatchHistory;
+ if(!cloudReady&&!(await cloudInit())){if(showResult)showMessage('履歴取得失敗','サーバーへ接続できませんでした。');return pvpMatchHistory;}
+ if(!cloudUser||cloudIsAnonymous()){pvpMatchHistory=[];pvpHistoryStatus='メール連携が必要';return pvpMatchHistory;}
+ pvpHistoryLoading=true;pvpHistoryStatus='取得中…';if(currentTab==='daily')renderDaily();
+ try{
+  var uid=cloudUser.id;
+  var res=await cloudClient.from('pvp_matches').select('id,attacker_id,defender_id,attacker_rating_before,defender_rating_before,rating_delta,attacker_won,status,created_at,completed_at').or('attacker_id.eq.'+uid+',defender_id.eq.'+uid).order('created_at',{ascending:false}).limit(20);
+  if(res.error)throw res.error;
+  var matches=res.data||[],ids=[];
+  matches.forEach(function(m){var id=m.attacker_id===uid?m.defender_id:m.attacker_id;if(id&&ids.indexOf(id)<0)ids.push(id);});
+  var names={};
+  if(ids.length){var pr=await cloudClient.from('pvp_profiles').select('user_id,display_name').in('user_id',ids);if(pr.error)throw pr.error;(pr.data||[]).forEach(function(p){names[p.user_id]=p.display_name;});}
+  pvpMatchHistory=matches.map(function(m){var attack=m.attacker_id===uid,done=m.status==='completed',won=done?(attack?m.attacker_won:!m.attacker_won):null,delta=done?(Number(m.rating_delta)||0)*(attack?1:-1):0,opponentId=attack?m.defender_id:m.attacker_id;return{id:m.id,side:attack?'攻撃':'防衛',opponent:names[opponentId]||'削除済みプレイヤー',won:won,delta:delta,status:m.status,at:m.completed_at||m.created_at};});
+  pvpHistoryStatus=pvpMatchHistory.length?pvpMatchHistory.length+'件取得':'履歴なし';
+  if(showResult)showMessage('PVP履歴更新',pvpHistoryStatus+'しました。');
+ }catch(e){logError(e);pvpHistoryStatus='取得失敗';if(showResult)showMessage('履歴取得失敗','通信状態またはデータベース権限を確認してください。');}
+ finally{pvpHistoryLoading=false;if(currentTab==='daily')renderDaily();}
+ return pvpMatchHistory;
+}
+function renderPvpHistory(){
+ if(!pvpMatchHistory.length)return'<div class="small">'+cloudEsc(pvpHistoryStatus)+'</div>';
+ return pvpMatchHistory.slice(0,10).map(function(m){var result=m.status==='completed'?(m.won?'勝利':'敗北'):(m.status==='expired'?'期限切れ':'対戦中'),color=m.status==='completed'?(m.won?'#8fe3ff':'#ff8ca1'):'#a8a8bd',delta=m.status==='completed'?' / Rate '+(m.delta>=0?'+':'')+m.delta:'';return'<div class="item-row"><div class="item-info"><strong>'+m.side+'：'+cloudEsc(m.opponent)+'</strong><div class="small">'+cloudTimeText(m.at)+'</div></div><div style="color:'+color+';font-weight:700;">'+result+delta+'</div></div>';}).join('');
+}
 async function beginServerPvpMatch(target){
  if(!target||!target.online||!target.userId)return null;
  if(!cloudReady&&!(await cloudInit()))return null;
@@ -1197,7 +1222,7 @@ async function submitPvpResult(attackerWon,battle){
   var res=await cloudClient.rpc('finish_pvp_match',{p_match_id:matchId,p_attacker_won:!!attackerWon});if(res.error)throw res.error;
   var row=Array.isArray(res.data)?res.data[0]:res.data;if(!row)throw new Error('empty pvp result');
   state.pvp.rating=Number(row.new_rating)||0;state.pvp.seasonPoints=Number(row.new_season_points)||0;state.pvp.wins=Number(row.total_wins)||0;state.pvp.losses=Number(row.total_losses)||0;state.pvp.bestRating=Math.max(state.pvp.bestRating||1000,state.pvp.rating);state.pvp.lastMatchAt=new Date().toISOString();state.pvp.activeMatchId=null;
-  var delta=Number(row.rating_delta)||0;state.pvp.lastResultText=(attackerWon?'勝利':'敗北')+' / Rate '+(delta>=0?'+':'')+delta+' → '+state.pvp.rating;saveGame();await fetchPvpProfiles(false);showMessage('オンライン対戦結果',state.pvp.lastResultText+'<br>シーズンPt '+state.pvp.seasonPoints+'<br>戦績 '+state.pvp.wins+'勝 '+state.pvp.losses+'敗');return true;
+  var delta=Number(row.rating_delta)||0;state.pvp.lastResultText=(attackerWon?'勝利':'敗北')+' / Rate '+(delta>=0?'+':'')+delta+' → '+state.pvp.rating;saveGame();await fetchPvpProfiles(false);await fetchPvpHistory(false);showMessage('オンライン対戦結果',state.pvp.lastResultText+'<br>シーズンPt '+state.pvp.seasonPoints+'<br>戦績 '+state.pvp.wins+'勝 '+state.pvp.losses+'敗');return true;
  }catch(e){logError(e);state.pvp.lastResultText='結果送信失敗（再送不可・端末戦闘は完了）';saveGame();showMessage('PVP結果送信失敗','通信またはサーバー処理に失敗しました。Rateは変更していません。連打せず、次の対戦前にランキングを更新してください。');return false;}
  finally{pvpResultBusy=false;if(currentTab==='daily')renderDaily();}
 }
@@ -1215,7 +1240,7 @@ if(!name){showMessage('名前未入力','キャラクター名を入力してく
 if(!selectedAbility){showMessage('異能未選択','リストから初期異能を1つ選択してください。');return;}
 if(hasSave()&&!safeConfirm('既存のセーブデータを上書きして新しく始めますか？'))return;
 tierCache={};
-state={dataVersion:34,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
+state={dataVersion:35,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
 alloc:{str:0,vit:0,def:0,agi:0,pow:0},currentGateIndex:0,stamina:100,staminaTs:serverTime(),hpTs:serverTime(),arenaPts:0,playerId:makeId(),auto:false,debugGates:false,
 learned:{first:[],second:[],integrated:[]},skillDone:{first:[],second:[],integrated:[]},
 inventory:[],equipment:[null,null,null],tut:{battles:0,gotItem:false,guideDone:false},frags:{},carriedSkills:[],abilityHistory:[],abilityMastery:{},abilityAcquired:{},titles:[],activeTitle:null,gold:CONFIG.START_GOLD,potions:CONFIG.START_POTIONS,iap:{noAds:false,passUntil:0},gateProgress:{},absorbed:[],pendingSkills:[],battle:null,bots:null,pvpTarget:null,pvp:{dataVersion:PVP_DATA_VERSION,seasonId:PVP_SEASON_ID,rating:1000,seasonPoints:0,wins:0,losses:0,defenseWins:0,defenseLosses:0,winStreak:0,bestRating:1000,aiStyle:'balanced',defenseSnapshot:null,lastSnapshotAt:null,lastMatchAt:null,activeMatchId:null,lastResultText:''},unlockedHidden:[],hiddenNotices:[],storySeen:{},storyNotices:[],totalWins:0};
@@ -2001,6 +2026,7 @@ return '<div class="item-row"><div class="item-info">'+mi.name+'<div class="smal
 '<button style="margin-top:8px;" onclick="startPvp()" '+((inBattle||pvpMatchBusy||pvpResultBusy)?'disabled':'')+'>'+(pvpMatchBusy?'対戦相手を準備中…':pvpResultBusy?'結果送信中…':'対戦('+COST.pvp+')')+'</button>'+
 '<button style="margin-top:8px;" onclick="fetchPvpProfiles(true)" '+(pvpOnlineLoading?'disabled':'')+'>対戦相手・ランキングを更新</button>'+
 '<h3 style="margin:14px 0 6px;">ランキング</h3>'+renderRanking()+'<hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;">'+
+'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><h3 style="margin:0;">PVP対戦履歴</h3><button onclick="fetchPvpHistory(true)" '+(pvpHistoryLoading?'disabled':'')+'>'+(pvpHistoryLoading?'取得中…':'履歴更新')+'</button></div><div class="small" style="margin:5px 0 8px;">攻撃戦と、他プレイヤーから挑戦された防衛戦を新しい順に表示します。</div>'+renderPvpHistory()+'<hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;">'+
 '<h3 style="margin:0 0 6px;">オンラインPVP防衛データ</h3><div class="small">メール連携済みプレイヤーは防衛ビルドを公開できます。勝敗・Rate・シーズンPtは対戦ごとにサーバーで一度だけ確定します。</div>'+
 '<div class="small" style="margin-top:8px;">シーズン：'+state.pvp.seasonId+' / Rate：'+state.pvp.rating+' / 防衛AI：'+pvpAiName(state.pvp.aiStyle)+'</div>'+
 '<div class="small">防衛データ：'+(state.pvp.lastSnapshotAt?cloudTimeText(state.pvp.lastSnapshotAt)+'／戦闘力 '+(state.pvp.defenseSnapshot&&state.pvp.defenseSnapshot.power||playerPower()):'未作成')+'</div>'+
@@ -2167,7 +2193,7 @@ else passWasOn=on;
 safe(renderHeader);if(currentTab==='daily')safe(renderDaily);if(currentTab==='shop')safe(renderShop);}},5000);
 mergeFlavor();
 renderStart();
-cloudInit().then(function(){renderStartContinue();if(state){scheduleCloudSave();fetchPvpProfiles(false);}});
+cloudInit().then(function(){renderStartContinue();if(state){scheduleCloudSave();fetchPvpProfiles(false);fetchPvpHistory(false);}});
 </script>
 </body>
 </html>
