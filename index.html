@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>異能ゲート・クロニクル v36</title>
+<title>異能ゲート・クロニクル v37</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b0b10;color:#e8e6f0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;line-height:1.5}
 #app{max-width:760px;margin:0 auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom))}
@@ -44,13 +44,14 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 <body>
 <div id="app">
 <section id="startScreen">
-<h1>異能ゲート・クロニクル <span class="small">v36</span></h1>
+<h1>異能ゲート・クロニクル <span class="small">v37</span></h1>
 <div class="card"><h2>キャラクター作成</h2>
 <p class="small">名前を入力し、10種の初期異能から1つ選択してください。世界には、条件を満たした者だけが発見できる5つの隠し異能も存在します。</p>
 <input id="playerNameInput" type="text" maxlength="12" placeholder="名前を入力" style="width:100%;font-size:18px;padding:12px;border-radius:12px;border:1px solid #444;background:#0d0d13;color:#fff;margin-bottom:6px;"></div>
 <div id="continueArea"></div>
 <div id="abilityList"></div>
 <button id="startButton" class="primary" style="width:100%;" onclick="startGame()">覚醒する</button>
+<div class="small" style="text-align:center;margin-top:12px;"><button onclick="showLegalPage('terms')">利用規約</button> <button onclick="showLegalPage('privacy')">プライバシーポリシー</button> <button onclick="showLegalPage('commerce')">特定商取引法に基づく表記</button></div>
 </section>
 <section id="mainScreen" style="display:none;">
 <div class="header-box" id="headerInfo"></div>
@@ -88,11 +89,12 @@ AUTO_MS:700,AUTO_MS_PASS:350,EQUIP_SLOTS:3};
    PRODUCTS の price/id をストア側の商品IDに合わせて差し替える。
    実決済は requestPurchase() の中だけを実装すれば良い。 */
 var IAP={PASS_STAMINA_MAX:150,PASS_DAILY_BONUS:0.20,PASS_DAILY_STAMINA:60,PASS_INVENTORY_MAX:130,PASS_EQUIP_SLOTS:3,PASS_DAYS:30,PASS_TITLE:'門を統べる者'};
+var TEST_PURCHASE_MODE=true;
 var PRODUCTS={
 noads:{id:'ign_noads_500',name:'広告削除パック',price:'￥500',type:'buyonce',
  desc:'広告視聴が不要になります。デイリーの広告報酬は、ボタンを押すだけで受け取れるようになります（1日'+5+'回の回数制限はそのまま）。'},
-pass:{id:'ign_pass_500_monthly',name:'覚醒者パス',price:'￥500 / 月',type:'subscription',
- desc:'30日間、以下の特典が有効になります。'}};
+pass:{id:'ign_pass_500_30days',name:'覚醒者パス（30日利用権）',price:'￥500',type:'fixed_30days',
+ desc:'購入時から30日間、以下の特典が有効になります。自動更新・定期課金はありません。'}};
 var EXP_TUNING={needBase:50,needPerLevel:45,needQuad:3,levelCoef:3,mobMult:1.0,bossMult:2.2,dailyMult:1.2,worldMult:1.5,pvpMult:1.5,secondMult:0.22,integratedMult:0.5,rebirthMult:1.55};
 var ENEMY_TUNING={hpMult:5.5,atkMult:0.8,bossHp:2.4,tierBoss:{F:1.9,E:2.1,D:2.2},bossAtk:0.6,secondPm:3.8,secondAtkPm:1.3,integratedPm:5.5,integratedAtkPm:2.2,tierHp:{F:0.34,E:0.6,D:0.70,C:0.94,B:1.06,A:1.18,S:1.38,SS:1.50,SSS:1.62,EX:1.9},tierAtk:{F:1.15},bandMid:0.15,rankStep:0.18,rankAtkStep:0.34,rankTaper:0.45,tutorialMid:0.15,followSpan:12,followMin:0.55,followMax:0.7,rebirthScale:0.10,exHp:1.6,exAtk:1.38,telegraphMult:2.8,telegraphChance:0.30,telegraphCd:3,bossAtkLate:1.82,telegraphLate:0.40};
 var ECONOMY={sellMult:0.55,goldPhase:{first:1.0,second:1.18,integrated:1.25}};
@@ -2045,14 +2047,42 @@ document.getElementById('dailyContent').innerHTML=h;}
    requestPurchase() が唯一のストア接続点。
    iOS: StoreKit / Android: Google Play Billing / Web: Stripe などをここに実装し、
    決済成功時に cb(true) を呼ぶだけで、以降の付与処理はそのまま動く。 */
+function legalCommonNotice(){
+return '<div class="card guide"><strong>公開準備中の法定情報</strong><div class="small" style="margin-top:6px;">現在は決済未実装のテスト版で、実際の請求は発生しません。販売者の住所・電話番号・問い合わせ先は、バーチャルオフィス契約と連絡体制の確定後に掲載します。必要情報が揃うまで実決済は開始しません。</div></div>';
+}
+function showLegalPage(kind){
+var title='',body='';
+if(kind==='commerce'){
+ title='特定商取引法に基づく表記（公開準備版）';
+ body=legalCommonNotice()+
+ '<div class="card"><div><strong>販売事業者</strong><br>実課金開始前に正式氏名を掲載</div><hr><div><strong>所在地・電話番号</strong><br>バーチャルオフィス契約後に掲載</div><hr><div><strong>問い合わせ先</strong><br>専用メールアドレス確定後に掲載</div><hr><div><strong>販売価格</strong><br>広告削除パック：500円（税込・買い切り）<br>覚醒者パス：500円（税込・30日利用権）</div><hr><div><strong>販売価格以外の負担</strong><br>インターネット接続料金・通信料金は利用者負担</div><hr><div><strong>支払方法・支払時期</strong><br>決済サービス確定後に掲載</div><hr><div><strong>提供時期</strong><br>決済完了後、原則として直ちにゲーム内へ反映</div><hr><div><strong>期間・自動更新</strong><br>覚醒者パスは購入時から30日間有効。自動更新・定期課金なし。追加購入時は残り期間へ30日加算</div><hr><div><strong>返品・キャンセル</strong><br>デジタル商品の性質上、提供開始後の利用者都合による返品・返金は原則不可。重複決済や提供不能など当方または決済上の不具合は個別対応</div><hr><div><strong>動作環境</strong><br>最新版のSafariまたはChrome、JavaScript・Cookie・通信機能が利用可能な端末。正式対応範囲は公開前試験後に確定</div></div>';
+ }else if(kind==='privacy'){
+ title='プライバシーポリシー（公開準備版）';
+ body=legalCommonNotice()+
+ '<div class="card"><p>本ゲームは、アカウント・クラウドセーブ・非同期PVPの提供に必要な範囲で、メールアドレス、認証用識別子、ゲームセーブ、公開名、戦闘力、PVP戦績・防衛データ・操作時刻等を取り扱います。</p><p>利用目的は、本人確認、データ引き継ぎ、ゲーム提供、不正防止、障害対応、ランキング運営です。法令に基づく場合を除き、目的外利用や無断販売は行いません。</p><p>認証・データ保存には外部クラウドサービスを利用します。端末内データはブラウザの保存領域にも記録されます。</p><p>アカウント削除、保有情報の確認、問い合わせ方法、保存期間、委託先の詳細は実課金開始前に正式版へ確定します。</p><p class="small">制定日：2026年8月18日</p></div>';
+ }else{
+ title='利用規約（公開準備版）';
+ body=legalCommonNotice()+
+ '<div class="card"><p>利用者は、本ゲームを個人の娯楽目的で利用できます。不正アクセス、改造によるランキング操作、複数アカウントを用いた不正な利益獲得、他者への迷惑行為は禁止します。</p><p>通信障害、保守、不正対策等により機能を停止・変更する場合があります。未成年者が有料商品を購入する場合は、法定代理人の同意を得てください。</p><p>広告削除パックは買い切り商品です。覚醒者パスは購入時から30日間の期間商品で、自動更新されません。商品の詳細・価格・有効期間は購入直前画面を優先します。</p><p>禁止行為、免責、準拠法、問い合わせ先、サービス終了時の取扱いは、実課金開始前に正式版へ確定します。</p><p class="small">制定日：2026年8月18日</p></div>';
+ }
+ showModal('<h3>'+title+'</h3>'+body+'<button class="primary" onclick="closeModal()">閉じる</button>');
+}
+function purchaseConditionHtml(pr){
+var period=pr.type==='fixed_30days'?'購入時から30日間（自動更新なし）':'期限なし（買い切り）';
+return '<div class="card"><div><strong>商品</strong><br>'+pr.name+'</div><hr><div><strong>支払総額</strong><br>'+pr.price+'（税込）</div><hr><div><strong>提供時期</strong><br>テスト確定後、直ちに端末データへ反映</div><hr><div><strong>利用期間</strong><br>'+period+'</div><hr><div><strong>返品・キャンセル</strong><br>テスト版のため請求なし。実決済版では提供開始後の利用者都合による返金は原則不可</div></div>';
+}
+function openLegalFromPurchase(kind){pendingPurchase=null;showLegalPage(kind);}
 function requestPurchase(productKey,cb){
 var pr=PRODUCTS[productKey];
-showModal('<h3>購入確認</h3><p><strong>'+pr.name+'</strong>（'+pr.price+'）</p>'+
-'<p class="small">これはテスト購入です。実際の決済は行われません。商品ID：'+pr.id+'</p>'+
-'<button class="primary" onclick="confirmPurchase(\''+productKey+'\')">購入する（テスト）</button> <button onclick="closeModal()">やめる</button>');
+if(!TEST_PURCHASE_MODE){showMessage('購入停止中','正式な販売者情報と決済接続が完了するまで購入できません。');return;}
+showModal('<h3>購入内容の最終確認</h3><div class="card guide"><strong>テスト購入</strong><div class="small">実際の決済・請求は発生しません。</div></div>'+purchaseConditionHtml(pr)+
+'<label style="display:flex;gap:10px;align-items:flex-start;margin:12px 0;"><input id="purchaseConsent" type="checkbox" style="width:24px;height:24px;flex:none;"><span>商品内容、金額、利用期間、自動更新がないことを確認しました。</span></label>'+
+'<div id="purchaseError" class="small" style="color:#ff9c9c;margin-bottom:8px;"></div><div class="small" style="margin-bottom:10px;"><button onclick="openLegalFromPurchase(\'commerce\')">特商法表記</button> <button onclick="openLegalFromPurchase(\'terms\')">利用規約</button> <button onclick="openLegalFromPurchase(\'privacy\')">プライバシー</button></div>'+
+'<button class="primary" onclick="confirmPurchase(\''+productKey+'\')">内容を確認して購入する（テスト）</button> <button onclick="cancelPurchase()">やめる</button>');
 pendingPurchase=cb;}
 var pendingPurchase=null;
-function confirmPurchase(k){var cb=pendingPurchase;pendingPurchase=null;closeModal();if(cb)cb(true);}
+function cancelPurchase(){pendingPurchase=null;closeModal();}
+function confirmPurchase(k){var c=document.getElementById('purchaseConsent');if(!c||!c.checked){var e=document.getElementById('purchaseError');if(e)e.textContent='商品内容を確認し、チェックを入れてください。';return;}var cb=pendingPurchase;pendingPurchase=null;closeModal();if(TEST_PURCHASE_MODE&&cb)cb(true);}
 function buyNoAds(){if(hasNoAds()){showMessage('購入済み','広告削除パックは購入済みです。');return;}
 requestPurchase('noads',function(ok){if(!ok)return;iap().noAds=true;renderAll();
 showMessage('購入完了','広告削除パックを適用しました。<br><br>デイリーの報酬は、以降ボタンを押すだけで受け取れます。<br>買い切りのため、再購入は不要です。');});}
@@ -2087,7 +2117,7 @@ return '<div style="margin-bottom:12px;"><strong style="color:#ffd76b;">'+S.name
 '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">'+S.pieces.map(function(p,i){var owned=ownsPiece(k,i);
 return '<button onclick="exchangeFrag(\''+k+'\','+i+')" '+((owned||f<FRAG.cost)?'disabled':'')+'>'+p.name+(owned?'（所持）':'　'+FRAG.cost+'個')+'</button>';}).join('')+'</div></div>';}).join('');
 return any?'<div class="card"><h3 style="margin-top:0;">遺物交換所</h3><div class="small">EXゲートで重複した部位は'+FRAG.name+'×'+FRAG.perDup+'に砕ける。'+FRAG.cost+'個で好きな部位と交換できる。</div><div style="margin-top:10px;">'+body+'</div></div>':'';})()+
-'<div class="card"><h3 style="margin-top:0;">課金</h3><div class="small">決済は未実装です。購入ボタンはテスト用で、実際の請求は発生しません。</div></div>'+
+'<div class="card guide"><h3 style="margin-top:0;">購入機能（テスト中）</h3><div class="small">決済は未実装です。購入ボタンはテスト用で、実際の請求は発生しません。販売者情報と決済接続が完了するまで実課金は開始しません。</div></div>'+
 '<div class="card'+(hasNoAds()?' selected':'')+'"><h3 style="margin-top:0;">'+PRODUCTS.noads.name+'<span class="small" style="margin-left:8px;">'+PRODUCTS.noads.price+' 買い切り</span></h3>'+
 '<p style="font-size:15px;">'+PRODUCTS.noads.desc+'</p>'+
 (hasNoAds()?'<div style="color:#ffd76b;font-weight:700;">適用中：ボタンだけで報酬を受け取れます</div>':'<button class="primary" style="width:100%;" onclick="buyNoAds()">'+PRODUCTS.noads.price+'で購入する</button>')+'</div>'+
@@ -2097,7 +2127,7 @@ perks.map(function(x){return '<div class="small" style="color:'+(passOn?'#ffd76b
 (passOn?'<div style="color:#ffd76b;font-weight:700;margin-top:10px;">有効：残り '+passDaysLeft()+' 日</div><button style="width:100%;margin-top:8px;" onclick="buyPass()">30日延長する（'+PRODUCTS.pass.price+'）</button>':'<button class="primary" style="width:100%;margin-top:10px;" onclick="buyPass()">'+PRODUCTS.pass.price+'で購入する</button>')+
 '</div>'+
 '<div class="card"><h3 style="margin-top:0;">その他</h3><button style="width:100%;" onclick="restorePurchase()">購入内容を復元する</button>'+
-'<div class="small" style="margin-top:8px;">サブスクリプションは期限切れで自動的に効果が外れます。装備枠が減った場合、はみ出した装備は所持品へ戻ります。</div></div>';
+'<div class="small" style="margin-top:8px;">覚醒者パスは自動更新されません。30日経過すると特典が終了します。装備所持品上限が減った場合も、所持品自体は削除されません。</div><div style="display:grid;gap:8px;margin-top:12px;"><button onclick="showLegalPage(\'commerce\')">特定商取引法に基づく表記</button><button onclick="showLegalPage(\'terms\')">利用規約</button><button onclick="showLegalPage(\'privacy\')">プライバシーポリシー</button></div></div>';
 if(DEBUG_MODE)h+='<div class="card dbg"><h3 style="margin-top:0;">デバッグ</h3>'+
 '<button onclick="dbgGrantAll()">両方付与</button> <button onclick="dbgClearIap()">課金リセット</button> <button onclick="dbgExpirePass()">パスを即失効</button></div>';
 document.getElementById('shopContent').innerHTML=h;}
