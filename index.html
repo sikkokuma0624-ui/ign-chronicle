@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>異能ゲート・クロニクル v29</title>
+<title>異能ゲート・クロニクル v30</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b0b10;color:#e8e6f0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;line-height:1.5}
 #app{max-width:760px;margin:0 auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom))}
@@ -44,7 +44,7 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 <body>
 <div id="app">
 <section id="startScreen">
-<h1>異能ゲート・クロニクル <span class="small">v29</span></h1>
+<h1>異能ゲート・クロニクル <span class="small">v30</span></h1>
 <div class="card"><h2>キャラクター作成</h2>
 <p class="small">名前を入力し、10種の初期異能から1つ選択してください。世界には、条件を満たした者だけが発見できる5つの隠し異能も存在します。</p>
 <input id="playerNameInput" type="text" maxlength="12" placeholder="名前を入力" style="width:100%;font-size:18px;padding:12px;border-radius:12px;border:1px solid #444;background:#0d0d13;color:#fff;margin-bottom:6px;"></div>
@@ -104,6 +104,8 @@ var REQ_BASE={F:1,E:8,D:15,C:25,B:35,A:45,S:50,SS:65,SSS:80,EX:100};
 var SAVE_KEY='ign_save_v1';
 var BACKUP_KEY='ign_save_backups_v1';
 var CLOUD_GAME_ID='inou_chronicle';
+var PVP_DATA_VERSION=1;
+var PVP_SEASON_ID='preseason-1';
 var SUPABASE_URL='https://ybbolpaerkhozzxlsvag.supabase.co';
 var SUPABASE_PUBLISHABLE_KEY='sb_publishable_xJ2RGNNCbWGBB0kd2LO2Ag_LJuQw0VB';
 var APP_URL='https://sikkokuma0624-ui.github.io/ign-chronicle/';
@@ -1085,6 +1087,11 @@ return key+'_'+(parseInt(m[1],10)-1)+'_'+slots.indexOf(m[2]);});});}
 function migrateAbilityMastery(s){if(s.abilityMastery&&s.abilityAcquired)return;
 var counts={};(s.abilityHistory||[]).concat([s.baseAbility,s.secondAbility]).forEach(function(id){if(id)counts[id]=(counts[id]||0)+1;});
 s.abilityMastery={};s.abilityAcquired={};Object.keys(counts).forEach(function(id){s.abilityAcquired[id]=true;s.abilityMastery[id]=Math.max(0,counts[id]-1);});}
+function migratePvpState(s){
+ var old=s.pvp||{};s.pvp=Object.assign({dataVersion:PVP_DATA_VERSION,seasonId:PVP_SEASON_ID,rating:1000,seasonPoints:0,wins:0,losses:0,defenseWins:0,defenseLosses:0,winStreak:0,bestRating:1000,aiStyle:'balanced',defenseSnapshot:null,lastSnapshotAt:null,lastMatchAt:null},old);
+ s.pvp.dataVersion=PVP_DATA_VERSION;if(!s.pvp.seasonId)s.pvp.seasonId=PVP_SEASON_ID;
+ if(['balanced','aggressive','defensive'].indexOf(s.pvp.aiStyle)<0)s.pvp.aiStyle='balanced';
+}
 function normalizeEquipmentTypes(s){if(!s)return;s.inventory=s.inventory||[];s.equipment=s.equipment||[];var all=s.equipment.filter(Boolean),ordered=[null,null,null],slot={weapon:0,armor:1,accessory:2};
 all.forEach(function(it){var n=slot[it.type];if(n==null||ordered[n])s.inventory.push(it);else ordered[n]=it;});s.equipment=ordered;}
 function migrate(s){s.statPoints=s.statPoints||0;s.alloc=Object.assign({str:0,vit:0,def:0,agi:0,pow:0},s.alloc||{});
@@ -1092,11 +1099,11 @@ s.inventory=s.inventory||[];s.equipment=s.equipment||[null,null];
 if((s.dataVersion||0)<24){var rarityMap=[0,2,4,6];
 s.inventory.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});
 s.equipment.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});}
-s.dataVersion=29;
+s.dataVersion=30;
 s.currentGateIndex=clamp(s.currentGateIndex||0,0,GATES.length-1);s.pendingSkills=s.pendingSkills||[];s.battle=null;s.auto=false;s.debugGates=s.debugGates||false;
 s.stamina=s.stamina==null?100:s.stamina;s.staminaTs=s.staminaTs||serverTime();s.arenaPts=s.arenaPts||0;s.playerId=s.playerId||makeId();
 s.learned=s.learned||{first:[],second:[],integrated:[]};s.skillDone=s.skillDone||{first:[],second:[],integrated:[]};
-s.rebirth=s.rebirth||0;s.tut=Object.assign({battles:0,gotItem:false,guideDone:false},s.tut||{});s.integratedReading=s.integratedReading||'';s.frags=s.frags||{};s.carriedSkills=s.carriedSkills||[];s.abilityHistory=s.abilityHistory||[];s.titles=s.titles||[];s.activeTitle=s.activeTitle||null;s.gold=s.gold||0;s.potions=s.potions==null?CONFIG.START_POTIONS:s.potions;s.hpTs=s.hpTs||serverTime();s.iap=Object.assign({noAds:false,passUntil:0},s.iap||{});s.unlockedHidden=s.unlockedHidden||[];[s.baseAbility,s.secondAbility].forEach(function(id){if(id&&isHidden(id)&&s.unlockedHidden.indexOf(id)<0)s.unlockedHidden.push(id);});s.hiddenNotices=s.hiddenNotices||[];s.storySeen=s.storySeen||{};s.storyNotices=s.storyNotices||[];s.totalWins=s.totalWins||0;migrateSkillIds(s);migrateAbilityMastery(s);normalizeEquipmentTypes(s);resetDailyOn(s);syncEquipSlots(s);return s;}
+s.rebirth=s.rebirth||0;s.tut=Object.assign({battles:0,gotItem:false,guideDone:false},s.tut||{});s.integratedReading=s.integratedReading||'';s.frags=s.frags||{};s.carriedSkills=s.carriedSkills||[];s.abilityHistory=s.abilityHistory||[];s.titles=s.titles||[];s.activeTitle=s.activeTitle||null;s.gold=s.gold||0;s.potions=s.potions==null?CONFIG.START_POTIONS:s.potions;s.hpTs=s.hpTs||serverTime();s.iap=Object.assign({noAds:false,passUntil:0},s.iap||{});s.unlockedHidden=s.unlockedHidden||[];[s.baseAbility,s.secondAbility].forEach(function(id){if(id&&isHidden(id)&&s.unlockedHidden.indexOf(id)<0)s.unlockedHidden.push(id);});s.hiddenNotices=s.hiddenNotices||[];s.storySeen=s.storySeen||{};s.storyNotices=s.storyNotices||[];s.totalWins=s.totalWins||0;migrateSkillIds(s);migrateAbilityMastery(s);migratePvpState(s);normalizeEquipmentTypes(s);resetDailyOn(s);syncEquipSlots(s);return s;}
 function syncEquipSlots(s){if(!s)return;s.equipment=s.equipment||[];
 var want=(s.iap&&s.iap.passUntil>serverTime())?IAP.PASS_EQUIP_SLOTS:CONFIG.EQUIP_SLOTS;
 while(s.equipment.length<want)s.equipment.push(null);
@@ -1122,6 +1129,11 @@ function regenStamina(){if(!state)return;var now=serverTime();var el=now-(state.
 if(g>0){if(state.stamina<staminaMax()){state.stamina=Math.min(staminaMax(),state.stamina+g);state.staminaTs+=g*CONFIG.STAMINA_REGEN_MS;}else state.staminaTs=now;}}
 function ensureBots(){if(!ARENA_BOT_MODE)return;if(!state.bots)state.bots=BOT_NAMES.map(function(n,i){return{name:n,power:400+i*800+Math.floor(Math.random()*300)};});}
 function playerPower(){var s=getStats();return Math.floor(s.hp/10+s.atk*3+s.def*2+s.crit+s.dodge+s.abilityPower+state.level*25+(state.phase==='integrated'?2000:state.phase==='second'?800:0)+state.arenaPts/10);}
+function pvpItemSnapshot(it){if(!it)return null;return{id:String(it.id||''),name:String(it.name||''),type:it.type||'',rarity:Number(it.rarity||0),rank:it.rank||'F',level:Number(it.level||it.reqLv||0),plus:Number(it.plus||0),atk:Number(it.atk||0),def:Number(it.def||0),hp:Number(it.hp||0),speed:Number(it.speed||0),crit:Number(it.crit||0),dodge:Number(it.dodge||0),abilityPower:Number(it.abilityPower||0)};}
+function buildPvpDefenseSnapshot(){var st=getStats(),p=state.pvp||{};return{schemaVersion:PVP_DATA_VERSION,playerId:state.playerId,displayName:state.name,level:state.level,phase:state.phase,rank:state.rank,rebirth:state.rebirth,power:playerPower(),rating:p.rating||1000,seasonId:p.seasonId||PVP_SEASON_ID,aiStyle:p.aiStyle||'balanced',stats:{hp:st.hp,atk:st.atk,def:st.def,crit:st.crit,dodge:st.dodge,hit:st.hit,speed:st.speed,abilityPower:st.abilityPower,lifesteal:st.lifesteal,follow:st.follow,defHeal:st.defHeal},abilities:{base:state.baseAbility||null,second:state.secondAbility||null,integrated:state.integratedName||null,mastery:Object.assign({},state.abilityMastery||{})},skills:{first:(state.learned.first||[]).slice(),second:(state.learned.second||[]).slice(),integrated:(state.learned.integrated||[]).slice(),carried:(state.carriedSkills||[]).map(function(s){return{id:s.id||'',name:s.name||'',tags:(s.tags||[]).slice(0,8)};})},equipment:(state.equipment||[]).map(pvpItemSnapshot),updatedAt:new Date().toISOString()};}
+function pvpAiName(v){return{balanced:'バランス',aggressive:'攻撃重視',defensive:'防御重視'}[v]||'バランス';}
+function setPvpAi(v){if(!state||['balanced','aggressive','defensive'].indexOf(v)<0)return;migratePvpState(state);state.pvp.aiStyle=v;updatePvpDefenseSnapshot(false);renderDaily();}
+function updatePvpDefenseSnapshot(showResult){if(!state)return;migratePvpState(state);var snap=buildPvpDefenseSnapshot();state.pvp.defenseSnapshot=snap;state.pvp.lastSnapshotAt=snap.updatedAt;saveGame();if(showResult)showMessage('防衛データ更新','現在のステータス・異能・スキル・装備を非同期PVP用データとして保存しました。<br><br>サーバー公開までは端末・クラウドセーブ内で保持されます。');}
 function renderStart(){document.getElementById('abilityList').innerHTML=ABILITIES.filter(function(ab){return!isHidden(ab.id);}).map(function(ab){var d=A_DATA[ab.id];
 return '<div class="card abilityCard" id="card_'+ab.id+'" onclick="selectAbility(\''+ab.id+'\')"><h3 style="margin:0 0 6px;color:'+ab.color+'">'+ab.name+'</h3><div class="small">'+ab.reading+' / '+ab.role+'</div><div style="margin-top:8px;">'+ab.desc+'</div><div class="small" style="margin-top:8px;color:'+ab.color+'">リソース：'+d.res+'（上限'+d.resMax+'）／継続ダメージ：'+d.dot+'</div></div>';}).join('');
 renderStartContinue();}
@@ -1136,10 +1148,10 @@ if(!name){showMessage('名前未入力','キャラクター名を入力してく
 if(!selectedAbility){showMessage('異能未選択','リストから初期異能を1つ選択してください。');return;}
 if(hasSave()&&!safeConfirm('既存のセーブデータを上書きして新しく始めますか？'))return;
 tierCache={};
-state={dataVersion:29,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
+state={dataVersion:30,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
 alloc:{str:0,vit:0,def:0,agi:0,pow:0},currentGateIndex:0,stamina:100,staminaTs:serverTime(),hpTs:serverTime(),arenaPts:0,playerId:makeId(),auto:false,debugGates:false,
 learned:{first:[],second:[],integrated:[]},skillDone:{first:[],second:[],integrated:[]},
-inventory:[],equipment:[null,null,null],tut:{battles:0,gotItem:false,guideDone:false},frags:{},carriedSkills:[],abilityHistory:[],abilityMastery:{},abilityAcquired:{},titles:[],activeTitle:null,gold:CONFIG.START_GOLD,potions:CONFIG.START_POTIONS,iap:{noAds:false,passUntil:0},gateProgress:{},absorbed:[],pendingSkills:[],battle:null,bots:null,pvpTarget:null,unlockedHidden:[],hiddenNotices:[],storySeen:{},storyNotices:[],totalWins:0};
+inventory:[],equipment:[null,null,null],tut:{battles:0,gotItem:false,guideDone:false},frags:{},carriedSkills:[],abilityHistory:[],abilityMastery:{},abilityAcquired:{},titles:[],activeTitle:null,gold:CONFIG.START_GOLD,potions:CONFIG.START_POTIONS,iap:{noAds:false,passUntil:0},gateProgress:{},absorbed:[],pendingSkills:[],battle:null,bots:null,pvpTarget:null,pvp:{dataVersion:PVP_DATA_VERSION,seasonId:PVP_SEASON_ID,rating:1000,seasonPoints:0,wins:0,losses:0,defenseWins:0,defenseLosses:0,winStreak:0,bestRating:1000,aiStyle:'balanced',defenseSnapshot:null,lastSnapshotAt:null,lastMatchAt:null},unlockedHidden:[],hiddenNotices:[],storySeen:{},storyNotices:[],totalWins:0};
 acquireAbility(selectedAbility);
 resetDailyOn(state);state.hp=getStats().hp;updateRank();
 hideStartScreen();document.getElementById('mainScreen').style.display='block';renderAll();showStory();}
@@ -1911,7 +1923,12 @@ return '<div class="item-row"><div class="item-info">'+mi.name+'<div class="smal
 '<button style="margin-top:8px;" onclick="startBattle(\'world\')" '+((w.rewarded||inBattle)?'disabled':'')+'>'+(w.rewarded?'報酬受取済':'討伐参加('+COST.world+')')+'</button></div>'+
 '<div class="card"><h3 style="margin-top:0;">アリーナ（'+(ARENA_BOT_MODE?'BOT非同期PvP':'オンライン非同期PvP')+'）</h3><div class="small">アリーナPt：'+state.arenaPts+'</div>'+
 '<button style="margin-top:8px;" onclick="startPvp()" '+(inBattle?'disabled':'')+'>対戦('+COST.pvp+')</button>'+
-'<h3 style="margin:14px 0 6px;">ランキング</h3>'+renderRanking()+'</div>';
+'<h3 style="margin:14px 0 6px;">ランキング</h3>'+renderRanking()+'<hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;">'+
+'<h3 style="margin:0 0 6px;">オンラインPVP準備データ</h3><div class="small">現在はBOT戦です。以下の防衛データはサーバー対応後、そのまま非同期PVPへ使用します。</div>'+
+'<div class="small" style="margin-top:8px;">シーズン：'+state.pvp.seasonId+' / 初期レート：'+state.pvp.rating+' / 防衛AI：'+pvpAiName(state.pvp.aiStyle)+'</div>'+
+'<div class="small">防衛データ：'+(state.pvp.lastSnapshotAt?cloudTimeText(state.pvp.lastSnapshotAt)+'／戦闘力 '+(state.pvp.defenseSnapshot&&state.pvp.defenseSnapshot.power||playerPower()):'未作成')+'</div>'+
+'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"><button onclick="setPvpAi(\'balanced\')" '+(state.pvp.aiStyle==='balanced'?'disabled':'')+'>バランス</button><button onclick="setPvpAi(\'aggressive\')" '+(state.pvp.aiStyle==='aggressive'?'disabled':'')+'>攻撃重視</button><button onclick="setPvpAi(\'defensive\')" '+(state.pvp.aiStyle==='defensive'?'disabled':'')+'>防御重視</button></div>'+
+'<button class="primary" style="margin-top:8px;width:100%;" onclick="updatePvpDefenseSnapshot(true)">現在のビルドを防衛データへ登録</button></div>';
 document.getElementById('dailyContent').innerHTML=h;}
 /* ============ 課金処理 ============
    requestPurchase() が唯一のストア接続点。
