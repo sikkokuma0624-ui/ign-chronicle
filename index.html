@@ -39,6 +39,25 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 .dbg{border:1px dashed #ff4d6d}
 .lock-card{opacity:.78;border-style:dashed}.guide{border-color:#ffd76b;box-shadow:0 0 0 1px #ffd76b inset}.story-chip{display:inline-block;padding:5px 9px;border-radius:999px;background:#2b2340;color:#d7c4ff;font-size:12px;margin:3px}
 #startScreen{position:fixed;inset:0;z-index:60;background:#0b0b10;overflow-y:auto;padding:16px 12px calc(24px + env(safe-area-inset-bottom));}
+.abilityCard{position:relative;overflow:hidden;cursor:pointer;transition:min-height .22s ease,border-color .18s ease,box-shadow .18s ease;padding:14px;isolation:isolate}
+.abilityCard:focus-visible{outline:2px solid #b79cff;outline-offset:2px}
+.abilityCard.selected{min-height:430px;padding-right:45%;background:#12121a}
+.ability-card-copy{position:relative;z-index:3}
+.ability-art{position:absolute;z-index:1;inset:0 0 0 auto;width:62%;height:100%;object-fit:cover;object-position:center top;pointer-events:none;user-select:none}
+.abilityCard.selected::after{content:"";position:absolute;z-index:2;inset:0;background:linear-gradient(90deg,#12121a 0%,#12121a 34%,rgba(18,18,26,.93) 45%,rgba(18,18,26,.30) 70%,rgba(18,18,26,.05) 100%);pointer-events:none}
+.ability-selected-chip{display:inline-block;margin:10px 0 0;padding:4px 9px;border-radius:999px;background:#2b2340;border:1px solid #8f6bff;color:#e8dcff;font-size:12px;font-weight:800}
+@media(max-width:430px){
+ .abilityCard.selected{min-height:390px;padding-right:42%}
+ .ability-art{width:67%;object-position:58% top}
+ .abilityCard.selected::after{background:linear-gradient(90deg,#12121a 0%,#12121a 31%,rgba(18,18,26,.94) 43%,rgba(18,18,26,.34) 72%,rgba(18,18,26,.08) 100%)}
+ .abilityCard.selected .ability-card-copy{font-size:15px}
+ .abilityCard.selected h3{font-size:21px}
+}
+@media(max-width:350px){
+ .abilityCard.selected{min-height:370px;padding-right:37%}
+ .ability-art{width:70%;opacity:.92}
+}
+@media(prefers-reduced-motion:reduce){.abilityCard{transition:none}}
 </style>
 </head>
 <body>
@@ -148,6 +167,18 @@ var ABILITIES=[
 {id:'gravity',name:'重力告白',reading:'グラビティ・コンフェッション',role:'重撃',desc:'重い一撃で敵の動きを鈍らせる。',color:'#b08968',effect:'gravity'},
 {id:'astral',name:'星読み',reading:'アストラル・リード',role:'予知',desc:'敵の次の手を予知し、回避や反撃を有利にする。',color:'#ffd76b',effect:'astral'},
 {id:'curtain',name:'終焉の帳',reading:'カーテン・オブ・エンド',role:'処刑',desc:'弱った敵に大ダメージを与える代償技。',color:'#8d99ae',effect:'curtain'}];
+var ABILITY_ART={
+ blackflame:'assets/abilities/blackflame.webp',
+ chronodebt:'assets/abilities/chronodebt.webp',
+ reverse:'assets/abilities/reverse.webp',
+ shadow:'assets/abilities/shadow.webp',
+ word:'assets/abilities/word.webp',
+ resonance:'assets/abilities/resonance.webp',
+ dream:'assets/abilities/dream.webp',
+ mirror:'assets/abilities/mirror.webp',
+ gravity:'assets/abilities/gravity.webp',
+ astral:'assets/abilities/astral.webp'
+};
 /* 初期選択は10種。下記5種はプレイ中の条件達成で恒久解放される。 */
 var HIDDEN_IDS=['fiction','nullfield','fate','grimoire','curtain'];
 var HIDDEN_RULES={
@@ -1275,9 +1306,13 @@ async function submitPvpResult(attackerWon,battle){
  finally{pvpResultBusy=false;if(currentTab==='daily')renderDaily();}
 }
 function renderStart(){document.getElementById('abilityList').innerHTML=ABILITIES.filter(function(ab){return!isHidden(ab.id);}).map(function(ab){var d=A_DATA[ab.id];
-return '<div class="card abilityCard" id="card_'+ab.id+'" onclick="selectAbility(\''+ab.id+'\')"><h3 style="margin:0 0 6px;color:'+ab.color+'">'+ab.name+'</h3><div class="small">'+ab.reading+' / '+ab.role+'</div><div style="margin-top:8px;">'+ab.desc+'</div><div class="small" style="margin-top:8px;color:'+ab.color+'">リソース：'+d.res+'（上限'+d.resMax+'）／継続ダメージ：'+d.dot+'</div></div>';}).join('');
+var chosen=selectedAbility===ab.id,art=ABILITY_ART[ab.id]||'';
+return '<div class="card abilityCard'+(chosen?' selected':'')+'" id="card_'+ab.id+'" role="button" tabindex="0" aria-pressed="'+(chosen?'true':'false')+'" onclick="selectAbility(\''+ab.id+'\')" onkeydown="abilityCardKey(event,\''+ab.id+'\')">'+
+(chosen&&art?'<img class="ability-art" src="'+art+'" alt="'+ab.name+'を発動する主人公" width="1024" height="1536" decoding="async">':'')+
+'<div class="ability-card-copy"><h3 style="margin:0 0 6px;color:'+ab.color+'">'+ab.name+'</h3><div class="small">'+ab.reading+' / '+ab.role+'</div><div style="margin-top:8px;">'+ab.desc+'</div><div class="small" style="margin-top:8px;color:'+ab.color+'">リソース：'+d.res+'（上限'+d.resMax+'）／継続ダメージ：'+d.dot+'</div>'+(chosen?'<span class="ability-selected-chip">選択中</span>':'')+'</div></div>';}).join('');
 renderStartContinue();}
-function selectAbility(id){selectedAbility=id;document.querySelectorAll('.abilityCard').forEach(function(el){el.classList.remove('selected');});document.getElementById('card_'+id).classList.add('selected');}
+function selectAbility(id){if(selectedAbility===id)return;selectedAbility=id;renderStart();var card=document.getElementById('card_'+id);if(card)card.scrollIntoView({behavior:window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'nearest'});}
+function abilityCardKey(e,id){if(e.key==='Enter'||e.key===' '){e.preventDefault();selectAbility(id);}}
 function hideStartScreen(){var el=document.getElementById('startScreen');if(!el)return;el.style.display='none';if(el.parentNode)el.parentNode.removeChild(el);}
 function safeConfirm(m){try{return confirm(m);}catch(e){return true;}}
 function resetSave(){if(safeConfirm('端末内のセーブデータを削除して最初から始めますか？\nクラウドのバックアップは、次の新規セーブ時に上書きされます。')){deleteSave();location.reload();}}
