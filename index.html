@@ -58,6 +58,18 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
  .ability-art{width:70%;opacity:.92}
 }
 @media(prefers-reduced-motion:reduce){.abilityCard{transition:none}}
+.modal-ability-card{position:relative;overflow:hidden;text-align:left;width:100%;margin-bottom:10px;padding:12px;border:1px solid #30303f;border-radius:14px;background:#101018;cursor:pointer;isolation:isolate}
+.modal-ability-card .desc{display:block;font-size:14px;color:#a7a3bf;margin-top:4px}
+.modal-ability-card.chosen{min-height:340px;padding-right:44%;border-color:#8f6bff;box-shadow:0 0 0 1px #8f6bff inset}
+.modal-ability-card .ability-card-copy{position:relative;z-index:3}
+.modal-ability-card .ability-art{width:62%}
+.modal-ability-card.chosen::after{content:"";position:absolute;z-index:2;inset:0;background:linear-gradient(90deg,#101018 0%,#101018 34%,rgba(16,16,24,.94) 45%,rgba(16,16,24,.30) 72%,rgba(16,16,24,.05) 100%);pointer-events:none}
+.modal-ability-card .choice-confirm{position:relative;z-index:4;width:100%;margin-top:12px;border-color:#8f6bff;background:#2b2340;font-weight:800}
+@media(max-width:430px){
+ .modal-ability-card.chosen{min-height:320px;padding-right:40%}
+ .modal-ability-card .ability-art{width:67%;object-position:58% top}
+ .modal-ability-card.chosen::after{background:linear-gradient(90deg,#101018 0%,#101018 30%,rgba(16,16,24,.95) 43%,rgba(16,16,24,.35) 74%,rgba(16,16,24,.08) 100%)}
+}
 </style>
 </head>
 <body>
@@ -2256,9 +2268,16 @@ return '<span class="chip '+(owned2?'chosen':'dim')+'">'+(owned2?p.name:'？？�
 '<div class="small" style="margin-top:4px;color:'+(eq>=2?'#ffd76b':'#9a97b0')+'">2部位：'+S.bonus2.label+'</div>'+
 '<div class="small" style="color:'+(eq>=3?'#ffd76b':'#9a97b0')+'">3部位：'+S.bonus3.label+'</div></div>';}).join('')+'</div>';
 document.getElementById('recordContent').innerHTML=story+hidden+guide+th+sets+'<div class="card"><h3 style="margin-top:0;">異能録</h3></div>'+ab+'<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">完全クリア済みゲート</h3></div>'+ch;}
-function openAwakening(){if(state.phase!=='first'||state.level<50)return;var rv=selectableAbilities().filter(function(a){return a.id!==state.baseAbility;});
+var awakeningPick=null;
+function openAwakening(){if(state.phase!=='first'||state.level<50)return;awakeningPick=null;renderAwakeningChoices();}
+function renderAwakeningChoices(){var rv=selectableAbilities().filter(function(a){return a.id!==state.baseAbility;});
 showModal('<h3>異能覚醒クエスト</h3><p>他の覚醒者を選び、その異能を奪え。<br>勝利すれば、お前はダブル異能者となる。</p>'+
-rv.map(function(a){return '<button class="skill-option" onclick="startRivalBattle(\''+a.id+'\')"><strong>'+RIVAL_NAMES[a.id]+'</strong><span class="desc">異能「'+nextAbilityName(a.id)+'」 / '+a.role+' / リソース：'+A_DATA[a.id].res+(state.abilityAcquired&&state.abilityAcquired[a.id]?'<br>再習得：異能効果がさらに＋5%強化される':'')+'</span></button>';}).join(''));}
+rv.map(function(a){var chosen=awakeningPick===a.id,art=ABILITY_ART[a.id]||'';
+return '<div class="modal-ability-card'+(chosen&&art?' chosen':'')+'" role="button" tabindex="0" aria-pressed="'+(chosen?'true':'false')+'" onclick="pickAwakeningAbility(\''+a.id+'\')" onkeydown="modalAbilityKey(event,\'awakening\',\''+a.id+'\')">'+
+(chosen&&art?'<img class="ability-art" src="'+art+'" alt="'+a.name+'を発動する主人公" width="1024" height="1536" decoding="async">':'')+
+'<div class="ability-card-copy"><strong>'+RIVAL_NAMES[a.id]+'</strong><span class="desc">異能「'+nextAbilityName(a.id)+'」 / '+a.role+' / リソース：'+A_DATA[a.id].res+(state.abilityAcquired&&state.abilityAcquired[a.id]?'<br>再習得：異能効果がさらに＋5%強化される':'')+'</span>'+
+(chosen?'<span class="ability-selected-chip">選択中</span><button class="choice-confirm" onclick="event.stopPropagation();startRivalBattle(\''+a.id+'\')">この覚醒者に挑む</button>':'')+'</div></div>';}).join('')+'<button onclick="closeModal()">やめる</button>');}
+function pickAwakeningAbility(id){if(awakeningPick===id)return;awakeningPick=id;renderAwakeningChoices();}
 function startRivalBattle(id){closeModal();startBattle('rival',id);}
 function absorbAbility(id){if(state.phase!=='first')return;var ab=getAbilityById(id);
 acquireAbility(id);
@@ -2292,11 +2311,18 @@ showModal('<h3>持ち込むスキルを選ぶ</h3><p>'+rbPick.length+' / '+n+' �
 function toggleCarry(i){var n=carrySlots();var k=rbPick.indexOf(i);
 if(k>=0)rbPick.splice(k,1);else{if(rbPick.length>=n)return;rbPick.push(i);}
 renderCarrySelect();}
-function openAbilitySelect(){
-var cand=selectableAbilities();
+var rebirthAbilityPick=null;
+function openAbilitySelect(){rebirthAbilityPick=null;renderRebirthAbilitySelect();}
+function renderRebirthAbilitySelect(){var cand=selectableAbilities();
 showModal('<h3>新しい第一異能を選ぶ</h3><p class="small">過去に習得した異能を再び選ぶと「異能＋1」となり、その異能効果がさらに5%強化される。<br>第二異能は、Lv50到達後の覚醒クエストで改めて奪う。</p>'+
-cand.map(function(a){var repeat=state.abilityAcquired&&state.abilityAcquired[a.id];return '<button class="skill-option" onclick="confirmRebirth(\''+a.id+'\')"><strong style="color:'+a.color+'">'+nextAbilityName(a.id)+'</strong><span class="desc">'+a.reading+' / '+a.role+'<br>'+a.desc+'<br>リソース：'+A_DATA[a.id].res+' ／ 継続ダメージ：'+A_DATA[a.id].dot+(repeat?'<br><span style="color:#ffd76b;">再習得ボーナス：異能効果＋5%</span>':'')+'</span></button>';}).join('')+
+cand.map(function(a){var repeat=state.abilityAcquired&&state.abilityAcquired[a.id],chosen=rebirthAbilityPick===a.id,art=ABILITY_ART[a.id]||'';
+return '<div class="modal-ability-card'+(chosen&&art?' chosen':'')+'" role="button" tabindex="0" aria-pressed="'+(chosen?'true':'false')+'" onclick="pickRebirthAbility(\''+a.id+'\')" onkeydown="modalAbilityKey(event,\'rebirth\',\''+a.id+'\')">'+
+(chosen&&art?'<img class="ability-art" src="'+art+'" alt="'+a.name+'を発動する主人公" width="1024" height="1536" decoding="async">':'')+
+'<div class="ability-card-copy"><strong style="color:'+a.color+'">'+nextAbilityName(a.id)+'</strong><span class="desc">'+a.reading+' / '+a.role+'<br>'+a.desc+'<br>リソース：'+A_DATA[a.id].res+' ／ 継続ダメージ：'+A_DATA[a.id].dot+(repeat?'<br><span style="color:#ffd76b;">再習得ボーナス：異能効果＋5%</span>':'')+'</span>'+
+(chosen?'<span class="ability-selected-chip">選択中</span><button class="choice-confirm" onclick="event.stopPropagation();confirmRebirth(\''+a.id+'\')">この異能で転生する</button>':'')+'</div></div>';}).join('')+
 '<button onclick="renderCarrySelect()">スキル選択に戻る</button>');}
+function pickRebirthAbility(id){if(rebirthAbilityPick===id)return;rebirthAbilityPick=id;renderRebirthAbilitySelect();}
+function modalAbilityKey(e,mode,id){if(e.key==='Enter'||e.key===' '){e.preventDefault();if(mode==='awakening')pickAwakeningAbility(id);else pickRebirthAbility(id);}}
 function confirmRebirth(newAbility){
 var all=learnedSkills();
 var carried=rbPick.map(function(i){var src=all[i];var cp={};for(var k in src)cp[k]=src[k];
