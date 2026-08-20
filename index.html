@@ -123,7 +123,9 @@ AUTO_MS:700,AUTO_MS_PASS:350,EQUIP_SLOTS:3};
    PRODUCTS の price/id をストア側の商品IDに合わせて差し替える。
    実決済は requestPurchase() の中だけを実装すれば良い。 */
 var IAP={PASS_STAMINA_MAX:150,PASS_DAILY_BONUS:0.20,PASS_DAILY_STAMINA:60,PASS_INVENTORY_MAX:130,PASS_EQUIP_SLOTS:3,PASS_DAYS:30,PASS_TITLE:'門を統べる者'};
-var TEST_PURCHASE_MODE=true;
+/* 決済・広告事業者との本番接続が完了するまで、報酬と有料特典を付与しない。 */
+var TEST_PURCHASE_MODE=false;
+var REWARDED_AD_AVAILABLE=false;
 var PRODUCTS={
 noads:{id:'ign_noads_500',name:'広告削除パック',price:'￥500',type:'buyonce',
  desc:'広告視聴が不要になります。デイリーの広告報酬は、ボタンを押すだけで受け取れるようになります（1日'+5+'回の回数制限はそのまま）。'},
@@ -2128,8 +2130,9 @@ addLog(state.name+'は'+POTION.name+'を呷った。','player');
 healPlayer(potionHeal(),'player');
 finishPlayerTurn();}
 function watchAd(){var d=state.daily;if(d.ad>=CONFIG.AD_DAILY_LIMIT){showMessage('本日の上限','本日の報酬は全て受け取り済み（'+CONFIG.AD_DAILY_LIMIT+'/'+CONFIG.AD_DAILY_LIMIT+'）。');return;}
+if(!hasNoAds()&&!REWARDED_AD_AVAILABLE){showMessage('広告準備中','動画広告の正式接続が完了するまで、広告報酬は利用できません。スタミナは時間経過で回復します。');return;}
 d.ad++;state.stamina=Math.min(staminaMax(),state.stamina+CONFIG.AD_STAMINA);d.missions.ads=(d.missions.ads||0)+1;renderAll();
-showMessage(hasNoAds()?'報酬を受け取った':'広告(テスト)','スタミナ+'+CONFIG.AD_STAMINA+'回復。本日の残り '+(CONFIG.AD_DAILY_LIMIT-d.ad)+' 回。');}
+showMessage(hasNoAds()?'報酬を受け取った':'広告視聴完了','スタミナ+'+CONFIG.AD_STAMINA+'回復。本日の残り '+(CONFIG.AD_DAILY_LIMIT-d.ad)+' 回。');}
 function claimMission(id){var d=state.daily;var mi=MISSIONS.find(function(x){return x.id===id;});var pr=d.missions[id]||0;
 if(pr<mi.need||d.claimed[id])return;d.claimed[id]=true;var got=[];
 var bm=dailyBonusMult();
@@ -2146,11 +2149,12 @@ var inBattle=state.battle&&!state.battle.over;
 var h='<div class="card"><h3 style="margin-top:0;">スタミナ</h3>'+
 '<div class="progress-label"><span>スタミナ</span><span>'+state.stamina+' / '+staminaMax()+'（+1まで '+fmtRegen()+'）</span></div>'+
 '<div class="bar"><div class="bar-fill st-fill" style="width:'+Math.min(100,state.stamina/staminaMax()*100)+'%"></div></div>'+
-'<button style="margin-top:10px;" onclick="watchAd()">'+(hasNoAds()?'報酬を受け取る':'広告を見る(テスト)')+' → スタミナ+'+CONFIG.AD_STAMINA+' / 残り'+(CONFIG.AD_DAILY_LIMIT-d.ad)+'回</button>'+
+'<button style="margin-top:10px;" onclick="watchAd()" '+((!hasNoAds()&&!REWARDED_AD_AVAILABLE)?'disabled':'')+'>'+(hasNoAds()?'報酬を受け取る':REWARDED_AD_AVAILABLE?'広告を見る':'動画広告は準備中')+' → スタミナ+'+CONFIG.AD_STAMINA+' / 残り'+(CONFIG.AD_DAILY_LIMIT-d.ad)+'回</button>'+
+((!hasNoAds()&&!REWARDED_AD_AVAILABLE)?'<div class="small" style="margin-top:6px;">広告事業者との接続後に利用可能になります。</div>':'')+
 (hasNoAds()?'<div class="small" style="margin-top:6px;color:#ffd76b;">広告削除パック適用中：視聴なしで受け取れます。</div>':'')+
 (hasPass()?'<div class="small" style="margin-top:6px;color:#ffd76b;">覚醒者パス：広告5回分＋追加'+IAP.PASS_DAILY_STAMINA+'、合計'+(CONFIG.AD_DAILY_LIMIT*CONFIG.AD_STAMINA+IAP.PASS_DAILY_STAMINA)+'スタミナを広告なしで'+(d.passStamina?'受取済み':'自動受取')+'。</div>':'')+'</div>'+
 '<div class="card"><h3 style="margin-top:0;">デイリーミッション</h3>'+
-MISSIONS.map(function(mi){var pr=Math.min(mi.need,d.missions[mi.id]||0);var done=pr>=mi.need;var cl=d.claimed[mi.id];
+MISSIONS.filter(function(mi){return mi.id!=='ads'||REWARDED_AD_AVAILABLE||hasNoAds();}).map(function(mi){var pr=Math.min(mi.need,d.missions[mi.id]||0);var done=pr>=mi.need;var cl=d.claimed[mi.id];
 return '<div class="item-row"><div class="item-info">'+mi.name+'<div class="small">'+pr+'/'+mi.need+(cl?' / 受取済':'')+'</div></div><button '+((!done||cl)?'disabled':'')+' onclick="claimMission(\''+mi.id+'\')">受取</button></div>';}).join('')+'</div>'+
 '<div class="card"><h3 style="margin-top:0;">デイリーボス</h3><div class="small">1日1回。エピック以上確定。</div>'+
 '<button style="margin-top:8px;" onclick="startBattle(\'daily\')" '+((d.boss||inBattle)?'disabled':'')+'>'+(d.boss?'本日は撃破済み':'挑戦('+COST.daily+')')+'</button></div>'+
@@ -2244,16 +2248,16 @@ return '<div style="margin-bottom:12px;"><strong style="color:#ffd76b;">'+S.name
 '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">'+S.pieces.map(function(p,i){var owned=ownsPiece(k,i);
 return '<button onclick="exchangeFrag(\''+k+'\','+i+')" '+((owned||f<FRAG.cost)?'disabled':'')+'>'+p.name+(owned?'（所持）':'　'+FRAG.cost+'個')+'</button>';}).join('')+'</div></div>';}).join('');
 return any?'<div class="card"><h3 style="margin-top:0;">遺物交換所</h3><div class="small">EXゲートで重複した部位は'+FRAG.name+'×'+FRAG.perDup+'に砕ける。'+FRAG.cost+'個で好きな部位と交換できる。</div><div style="margin-top:10px;">'+body+'</div></div>':'';})()+
-'<div class="card guide"><h3 style="margin-top:0;">購入機能（テスト中）</h3><div class="small">決済は未実装です。購入ボタンはテスト用で、実際の請求は発生しません。販売者情報と決済接続が完了するまで実課金は開始しません。</div></div>'+
+'<div class="card guide"><h3 style="margin-top:0;">購入機能（準備中）</h3><div class="small">現在、購入・請求はできません。販売者情報と正式な決済接続が完了するまで、購入ボタンと特典付与を停止しています。</div></div>'+
 '<div class="card'+(hasNoAds()?' selected':'')+'"><h3 style="margin-top:0;">'+PRODUCTS.noads.name+'<span class="small" style="margin-left:8px;">'+PRODUCTS.noads.price+' 買い切り</span></h3>'+
 '<p style="font-size:15px;">'+PRODUCTS.noads.desc+'</p>'+
-(hasNoAds()?'<div style="color:#ffd76b;font-weight:700;">適用中：ボタンだけで報酬を受け取れます</div>':'<button class="primary" style="width:100%;" onclick="buyNoAds()">'+PRODUCTS.noads.price+'で購入する</button>')+'</div>'+
+(hasNoAds()?'<div style="color:#ffd76b;font-weight:700;">適用中：ボタンだけで報酬を受け取れます</div>':'<button class="primary" style="width:100%;" onclick="buyNoAds()" '+(!TEST_PURCHASE_MODE?'disabled':'')+'>'+(!TEST_PURCHASE_MODE?'販売準備中':PRODUCTS.noads.price+'で購入する')+'</button>')+'</div>'+
 '<div class="card'+(passOn?' selected':'')+'"><h3 style="margin-top:0;">'+PRODUCTS.pass.name+'<span class="small" style="margin-left:8px;">'+PRODUCTS.pass.price+'</span></h3>'+
 '<p style="font-size:15px;">'+PRODUCTS.pass.desc+'</p>'+
 perks.map(function(x){return '<div class="small" style="color:'+(passOn?'#ffd76b':'#9a97b0')+';margin:4px 0;">◆ '+x+'</div>';}).join('')+
-(passOn?'<div style="color:#ffd76b;font-weight:700;margin-top:10px;">有効：残り '+passDaysLeft()+' 日</div><button style="width:100%;margin-top:8px;" onclick="buyPass()">30日延長する（'+PRODUCTS.pass.price+'）</button>':'<button class="primary" style="width:100%;margin-top:10px;" onclick="buyPass()">'+PRODUCTS.pass.price+'で購入する</button>')+
+(passOn?'<div style="color:#ffd76b;font-weight:700;margin-top:10px;">有効：残り '+passDaysLeft()+' 日</div><button style="width:100%;margin-top:8px;" onclick="buyPass()" '+(!TEST_PURCHASE_MODE?'disabled':'')+'>'+(!TEST_PURCHASE_MODE?'延長購入は準備中':'30日延長する（'+PRODUCTS.pass.price+'）')+'</button>':'<button class="primary" style="width:100%;margin-top:10px;" onclick="buyPass()" '+(!TEST_PURCHASE_MODE?'disabled':'')+'>'+(!TEST_PURCHASE_MODE?'販売準備中':PRODUCTS.pass.price+'で購入する')+'</button>')+
 '</div>'+
-'<div class="card"><h3 style="margin-top:0;">その他</h3><button style="width:100%;" onclick="restorePurchase()">購入内容を復元する</button>'+
+'<div class="card"><h3 style="margin-top:0;">その他</h3><button style="width:100%;" onclick="restorePurchase()" '+(!TEST_PURCHASE_MODE?'disabled':'')+'>購入内容を復元する'+(!TEST_PURCHASE_MODE?'（準備中）':'')+'</button>'+
 '<div class="small" style="margin-top:8px;">覚醒者パスは自動更新されません。30日経過すると特典が終了します。装備所持品上限が減った場合も、所持品自体は削除されません。</div><div style="display:grid;gap:8px;margin-top:12px;"><button onclick="showLegalPage(\'commerce\')">特定商取引法に基づく表記</button><button onclick="showLegalPage(\'terms\')">利用規約</button><button onclick="showLegalPage(\'privacy\')">プライバシーポリシー</button></div></div>';
 if(DEBUG_MODE)h+='<div class="card dbg"><h3 style="margin-top:0;">デバッグ</h3>'+
 '<button onclick="dbgGrantAll()">両方付与</button> <button onclick="dbgClearIap()">課金リセット</button> <button onclick="dbgExpirePass()">パスを即失効</button></div>';
