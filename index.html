@@ -156,7 +156,7 @@ var pvpResultBusy=false,pvpMatchBusy=false;
 var pvpMatchHistory=[],pvpHistoryLoading=false,pvpHistoryStatus='未取得';
 var pvpDailyUsed=0,pvpDailyRemaining=PVP_DAILY_LIMIT,pvpDailyStatus='取得前',pvpDailyLoading=false,pvpStartError='';
 function serverTime(){return Date.now();}
-function iap(){if(!state)return{noAds:false,passUntil:0};if(!state.iap)state.iap={noAds:false,passUntil:0};return state.iap;}
+function iap(){if(!state)return{noAds:false,passUntil:0,testPurchaseCleanupV1:true};if(!state.iap)state.iap={noAds:false,passUntil:0,testPurchaseCleanupV1:true};return state.iap;}
 function hasNoAds(){return!!iap().noAds;}
 function hasPass(){return iap().passUntil>serverTime();}
 function passDaysLeft(){if(!hasPass())return 0;return Math.ceil((iap().passUntil-serverTime())/86400000);}
@@ -1177,11 +1177,11 @@ if(oldVersion<24){var rarityMap=[0,2,4,6];
 s.inventory.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});
 s.equipment.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});}
 if(oldVersion<33){s.inventory.concat(s.equipment).forEach(function(it){if(!it||it.reqLv==null)return;var cap=(REQ_BASE[it.rank]||1)+Math.floor((Number(it.rarity)||0)/3)+2;it.reqLv=Math.max(1,Math.min(Number(it.reqLv)||1,Math.min(100,cap)));});}
-s.dataVersion=36;
+s.dataVersion=37;
 s.currentGateIndex=clamp(s.currentGateIndex||0,0,GATES.length-1);s.pendingSkills=s.pendingSkills||[];s.battle=null;s.auto=false;s.debugGates=s.debugGates||false;
 s.stamina=s.stamina==null?100:s.stamina;s.staminaTs=s.staminaTs||serverTime();s.arenaPts=s.arenaPts||0;s.playerId=s.playerId||makeId();
 s.learned=s.learned||{first:[],second:[],integrated:[]};s.skillDone=s.skillDone||{first:[],second:[],integrated:[]};
-s.rebirth=s.rebirth||0;s.tut=Object.assign({battles:0,gotItem:false,guideDone:false},s.tut||{});s.integratedReading=s.integratedReading||'';s.frags=s.frags||{};s.carriedSkills=s.carriedSkills||[];s.abilityHistory=s.abilityHistory||[];s.titles=s.titles||[];s.activeTitle=s.activeTitle||null;s.gold=s.gold||0;s.potions=s.potions==null?CONFIG.START_POTIONS:s.potions;s.hpTs=s.hpTs||serverTime();s.iap=Object.assign({noAds:false,passUntil:0},s.iap||{});s.unlockedHidden=s.unlockedHidden||[];[s.baseAbility,s.secondAbility].forEach(function(id){if(id&&isHidden(id)&&s.unlockedHidden.indexOf(id)<0)s.unlockedHidden.push(id);});s.hiddenNotices=s.hiddenNotices||[];s.storySeen=s.storySeen||{};s.storyNotices=s.storyNotices||[];s.totalWins=s.totalWins||0;migrateSkillIds(s);migrateAbilityMastery(s);migratePvpState(s);normalizeEquipmentTypes(s);resetDailyOn(s);syncEquipSlots(s);return s;}
+s.rebirth=s.rebirth||0;s.tut=Object.assign({battles:0,gotItem:false,guideDone:false},s.tut||{});s.integratedReading=s.integratedReading||'';s.frags=s.frags||{};s.carriedSkills=s.carriedSkills||[];s.abilityHistory=s.abilityHistory||[];s.titles=s.titles||[];s.activeTitle=s.activeTitle||null;s.gold=s.gold||0;s.potions=s.potions==null?CONFIG.START_POTIONS:s.potions;s.hpTs=s.hpTs||serverTime();s.iap=Object.assign({noAds:false,passUntil:0},s.iap||{});if(!s.iap.testPurchaseCleanupV1){s.iap.noAds=false;s.iap.passUntil=0;s.iap.testPurchaseCleanupV1=true;}s.unlockedHidden=s.unlockedHidden||[];[s.baseAbility,s.secondAbility].forEach(function(id){if(id&&isHidden(id)&&s.unlockedHidden.indexOf(id)<0)s.unlockedHidden.push(id);});s.hiddenNotices=s.hiddenNotices||[];s.storySeen=s.storySeen||{};s.storyNotices=s.storyNotices||[];s.totalWins=s.totalWins||0;migrateSkillIds(s);migrateAbilityMastery(s);migratePvpState(s);normalizeEquipmentTypes(s);resetDailyOn(s);syncEquipSlots(s);return s;}
 function syncEquipSlots(s){if(!s)return;s.equipment=s.equipment||[];
 var want=(s.iap&&s.iap.passUntil>serverTime())?IAP.PASS_EQUIP_SLOTS:CONFIG.EQUIP_SLOTS;
 while(s.equipment.length<want)s.equipment.push(null);
@@ -1354,10 +1354,10 @@ if(!name){showMessage('名前未入力','キャラクター名を入力してく
 if(!selectedAbility){showMessage('異能未選択','リストから初期異能を1つ選択してください。');return;}
 if(hasSave()&&!safeConfirm('既存のセーブデータを上書きして新しく始めますか？'))return;
 tierCache={};
-state={dataVersion:36,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
+state={dataVersion:37,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
 alloc:{str:0,vit:0,def:0,agi:0,pow:0},currentGateIndex:0,stamina:100,staminaTs:serverTime(),hpTs:serverTime(),arenaPts:0,playerId:makeId(),auto:false,debugGates:false,
 learned:{first:[],second:[],integrated:[]},skillDone:{first:[],second:[],integrated:[]},
-inventory:[],equipment:[null,null,null],tut:{battles:0,gotItem:false,guideDone:false},frags:{},carriedSkills:[],abilityHistory:[],abilityMastery:{},abilityAcquired:{},titles:[],activeTitle:null,gold:CONFIG.START_GOLD,potions:CONFIG.START_POTIONS,iap:{noAds:false,passUntil:0},gateProgress:{},absorbed:[],pendingSkills:[],battle:null,bots:null,pvpTarget:null,pvp:{dataVersion:PVP_DATA_VERSION,seasonId:PVP_SEASON_ID,rating:1000,seasonPoints:0,wins:0,losses:0,defenseWins:0,defenseLosses:0,winStreak:0,bestRating:1000,aiStyle:'balanced',defenseSnapshot:null,lastSnapshotAt:null,lastMatchAt:null,activeMatchId:null,lastResultText:''},unlockedHidden:[],hiddenNotices:[],storySeen:{},storyNotices:[],totalWins:0};
+inventory:[],equipment:[null,null,null],tut:{battles:0,gotItem:false,guideDone:false},frags:{},carriedSkills:[],abilityHistory:[],abilityMastery:{},abilityAcquired:{},titles:[],activeTitle:null,gold:CONFIG.START_GOLD,potions:CONFIG.START_POTIONS,iap:{noAds:false,passUntil:0,testPurchaseCleanupV1:true},gateProgress:{},absorbed:[],pendingSkills:[],battle:null,bots:null,pvpTarget:null,pvp:{dataVersion:PVP_DATA_VERSION,seasonId:PVP_SEASON_ID,rating:1000,seasonPoints:0,wins:0,losses:0,defenseWins:0,defenseLosses:0,winStreak:0,bestRating:1000,aiStyle:'balanced',defenseSnapshot:null,lastSnapshotAt:null,lastMatchAt:null,activeMatchId:null,lastResultText:''},unlockedHidden:[],hiddenNotices:[],storySeen:{},storyNotices:[],totalWins:0};
 acquireAbility(selectedAbility);
 resetDailyOn(state);state.hp=getStats().hp;updateRank();
 hideStartScreen();document.getElementById('mainScreen').style.display='block';renderAll();showStory();}
@@ -2263,7 +2263,7 @@ if(DEBUG_MODE)h+='<div class="card dbg"><h3 style="margin-top:0;">デバッグ</
 '<button onclick="dbgGrantAll()">両方付与</button> <button onclick="dbgClearIap()">課金リセット</button> <button onclick="dbgExpirePass()">パスを即失効</button></div>';
 document.getElementById('shopContent').innerHTML=h;}
 function dbgGrantAll(){if(!DEBUG_MODE)return;iap().noAds=true;iap().passUntil=serverTime()+IAP.PASS_DAYS*86400000;syncEquipSlots(state);grantPassDaily();renderAll();}
-function dbgClearIap(){if(!DEBUG_MODE)return;state.iap={noAds:false,passUntil:0};syncEquipSlots(state);state.stamina=Math.min(state.stamina,staminaMax());renderAll();}
+function dbgClearIap(){if(!DEBUG_MODE)return;state.iap={noAds:false,passUntil:0,testPurchaseCleanupV1:true};syncEquipSlots(state);state.stamina=Math.min(state.stamina,staminaMax());renderAll();}
 function dbgExpirePass(){if(!DEBUG_MODE)return;iap().passUntil=serverTime()-1000;syncEquipSlots(state);state.stamina=Math.min(state.stamina,staminaMax());renderAll();}
 function renderRecord(){var ab=state.absorbed.length?state.absorbed.map(function(id){var a=getAbilityById(id);var d=A_DATA[id];return '<div class="card"><strong>'+a.name+'</strong><div class="small">'+RIVAL_NAMES[id]+'の異能記憶 ／ リソース：'+d.res+'</div><div class="small" style="margin-top:6px;">'+a.desc+'</div></div>';}).join(''):'<p class="small">まだ吸収した異能はない。</p>';
 var sc=storyChapters(state.baseAbility),avail=availableStoryCount();
