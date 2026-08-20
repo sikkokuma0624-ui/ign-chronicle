@@ -143,7 +143,7 @@ var SAVE_KEY='ign_save_v1';
 var BACKUP_KEY='ign_save_backups_v1';
 var CLOUD_GAME_ID='inou_chronicle';
 var PVP_DATA_VERSION=2;
-var CLIENT_BUILD_VERSION=40;
+var CLIENT_BUILD_VERSION=41;
 var PVP_DAILY_LIMIT=5;
 var PVP_SEASON_ID='preseason-1';
 var SUPABASE_URL='https://ybbolpaerkhozzxlsvag.supabase.co';
@@ -928,7 +928,7 @@ var MISSIONS=[
 {id:'wins',name:'戦闘に3回勝利する',need:3,reward:{stamina:20,potion:2}},
 {id:'bosses',name:'ボスを1体撃破する',need:1,reward:{exp:200}},
 {id:'pvp',name:'アリーナで1勝する',need:1,reward:{item:1}},
-{id:'ads',name:'広告を1回見る(テスト)',need:1,reward:{stamina:10}}];
+{id:'ads',name:'広告を1回見る',need:1,reward:{stamina:10}}];
 var TITLES=[
 {id:'awakened',name:'覚醒者',desc:'第一異能を極める（Lv50到達）',check:function(){return state.phase!=='first'||state.level>=50;}},
 {id:'double',name:'二律の器',desc:'第二異能を吸収する',check:function(){return state.phase==='second'||state.phase==='integrated';}},
