@@ -70,6 +70,9 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
  .modal-ability-card .ability-art{width:67%;object-position:58% top}
  .modal-ability-card.chosen::after{background:linear-gradient(90deg,#101018 0%,#101018 30%,rgba(16,16,24,.95) 43%,rgba(16,16,24,.35) 74%,rgba(16,16,24,.08) 100%)}
 }
+.art-preview-entry{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:80;border-color:#8f6bff;background:#2b2340;font-weight:800;box-shadow:0 6px 24px rgba(0,0,0,.45)}
+.art-preview-status{margin:8px 0 12px;padding:8px 10px;border-radius:10px;background:#181824;color:#b9b5ca;font-size:13px}
+.art-load-error{display:inline-block;margin-top:10px;padding:5px 8px;border:1px solid #ff4d6d;border-radius:8px;background:#351018;color:#ffb2bf;font-size:12px;font-weight:700}
 </style>
 </head>
 <body>
@@ -1325,11 +1328,20 @@ async function submitPvpResult(attackerWon,battle){
 function renderStart(){document.getElementById('abilityList').innerHTML=ABILITIES.filter(function(ab){return!isHidden(ab.id);}).map(function(ab){var d=A_DATA[ab.id];
 var chosen=selectedAbility===ab.id,art=ABILITY_ART[ab.id]||'';
 return '<div class="card abilityCard'+(chosen?' selected':'')+'" id="card_'+ab.id+'" role="button" tabindex="0" aria-pressed="'+(chosen?'true':'false')+'" onclick="selectAbility(\''+ab.id+'\')" onkeydown="abilityCardKey(event,\''+ab.id+'\')">'+
-(chosen&&art?'<img class="ability-art" src="'+art+'" alt="'+ab.name+'を発動する主人公" width="1024" height="1536" decoding="async">':'')+
+(chosen&&art?'<img class="ability-art" src="'+art+'" alt="'+ab.name+'を発動する主人公" width="1024" height="1536" decoding="async" onerror="abilityArtError(this)">':'')+
 '<div class="ability-card-copy"><h3 style="margin:0 0 6px;color:'+ab.color+'">'+ab.name+'</h3><div class="small">'+ab.reading+' / '+ab.role+'</div><div style="margin-top:8px;">'+ab.desc+'</div><div class="small" style="margin-top:8px;color:'+ab.color+'">リソース：'+d.res+'（上限'+d.resMax+'）／継続ダメージ：'+d.dot+'</div>'+(chosen?'<span class="ability-selected-chip">選択中</span>':'')+'</div></div>';}).join('');
 renderStartContinue();}
 function selectAbility(id){if(selectedAbility===id)return;selectedAbility=id;renderStart();var card=document.getElementById('card_'+id);if(card)card.scrollIntoView({behavior:window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'nearest'});}
 function abilityCardKey(e,id){if(e.key==='Enter'||e.key===' '){e.preventDefault();selectAbility(id);}}
+function abilityArtError(img){if(!img||!img.parentNode)return;var badge=document.createElement('span');badge.className='art-load-error';badge.textContent='画像を読み込めません：'+(img.getAttribute('src')||'不明');var copy=img.parentNode.querySelector('.ability-card-copy');if(copy)copy.appendChild(badge);img.remove();}
+var artPreviewPick='blackflame';
+function artPreviewEnabled(){try{return new URLSearchParams(location.search).get('arttest')==='1';}catch(e){return false;}}
+function installArtPreviewEntry(){if(!artPreviewEnabled()||document.getElementById('artPreviewEntry'))return;var b=document.createElement('button');b.id='artPreviewEntry';b.className='art-preview-entry';b.textContent='全15異能の画像確認';b.onclick=openArtPreview;document.body.appendChild(b);}
+function openArtPreview(){artPreviewPick=artPreviewPick||'blackflame';renderArtPreview();checkAbilityArtAssets();}
+function renderArtPreview(){showModal('<h3>異能イラスト確認モード</h3><p class="small">セーブ・レベル・隠し異能の解放状況には影響しません。項目をタップすると、その画像だけ展開します。</p><div id="artPreviewStatus" class="art-preview-status">全15枚を確認中…</div>'+ABILITIES.map(function(a){var chosen=artPreviewPick===a.id,art=ABILITY_ART[a.id]||'';return '<div class="modal-ability-card'+(chosen&&art?' chosen':'')+'" role="button" tabindex="0" aria-pressed="'+(chosen?'true':'false')+'" onclick="pickArtPreview(\''+a.id+'\')" onkeydown="artPreviewKey(event,\''+a.id+'\')">'+(chosen&&art?'<img class="ability-art" src="'+art+'" alt="'+a.name+'を発動する主人公" width="1024" height="1536" decoding="async" onerror="abilityArtError(this)">':'')+'<div class="ability-card-copy"><strong style="color:'+a.color+'">'+a.name+'</strong><span class="desc">'+a.reading+' / '+a.role+(isHidden(a.id)?'<br>隠し異能':'')+'</span>'+(chosen?'<span class="ability-selected-chip">表示中</span>':'')+'</div></div>';}).join('')+'<button onclick="closeModal()">確認を終了</button>');}
+function pickArtPreview(id){if(artPreviewPick===id)return;artPreviewPick=id;renderArtPreview();checkAbilityArtAssets();}
+function artPreviewKey(e,id){if(e.key==='Enter'||e.key===' '){e.preventDefault();pickArtPreview(id);}}
+function checkAbilityArtAssets(){var status=document.getElementById('artPreviewStatus');if(!status)return;var ids=Object.keys(ABILITY_ART),done=0,failed=[];ids.forEach(function(id){var im=new Image();im.onload=finish;im.onerror=function(){failed.push(ABILITY_ART[id]);finish();};im.src=ABILITY_ART[id]+'?artcheck=1';function finish(){done++;var now=document.getElementById('artPreviewStatus');if(!now)return;if(done<ids.length){now.textContent='画像確認中：'+done+' / '+ids.length;}else if(failed.length){now.innerHTML='<span style="color:#ff9c9c;font-weight:800;">読込失敗 '+failed.length+'枚</span><br>'+failed.join(' / ');}else{now.innerHTML='<span style="color:#7dffb0;font-weight:800;">全15枚の読込成功</span>';}}});}
 function hideStartScreen(){var el=document.getElementById('startScreen');if(!el)return;el.style.display='none';if(el.parentNode)el.parentNode.removeChild(el);}
 function safeConfirm(m){try{return confirm(m);}catch(e){return true;}}
 function resetSave(){if(safeConfirm('端末内のセーブデータを削除して最初から始めますか？\nクラウドのバックアップは、次の新規セーブ時に上書きされます。')){deleteSave();location.reload();}}
@@ -2279,7 +2291,7 @@ function renderAwakeningChoices(){var rv=selectableAbilities().filter(function(a
 showModal('<h3>異能覚醒クエスト</h3><p>他の覚醒者を選び、その異能を奪え。<br>勝利すれば、お前はダブル異能者となる。</p>'+
 rv.map(function(a){var chosen=awakeningPick===a.id,art=ABILITY_ART[a.id]||'';
 return '<div class="modal-ability-card'+(chosen&&art?' chosen':'')+'" role="button" tabindex="0" aria-pressed="'+(chosen?'true':'false')+'" onclick="pickAwakeningAbility(\''+a.id+'\')" onkeydown="modalAbilityKey(event,\'awakening\',\''+a.id+'\')">'+
-(chosen&&art?'<img class="ability-art" src="'+art+'" alt="'+a.name+'を発動する主人公" width="1024" height="1536" decoding="async">':'')+
+(chosen&&art?'<img class="ability-art" src="'+art+'" alt="'+a.name+'を発動する主人公" width="1024" height="1536" decoding="async" onerror="abilityArtError(this)">':'')+
 '<div class="ability-card-copy"><strong>'+RIVAL_NAMES[a.id]+'</strong><span class="desc">異能「'+nextAbilityName(a.id)+'」 / '+a.role+' / リソース：'+A_DATA[a.id].res+(state.abilityAcquired&&state.abilityAcquired[a.id]?'<br>再習得：異能効果がさらに＋5%強化される':'')+'</span>'+
 (chosen?'<span class="ability-selected-chip">選択中</span><button class="choice-confirm" onclick="event.stopPropagation();startRivalBattle(\''+a.id+'\')">この覚醒者に挑む</button>':'')+'</div></div>';}).join('')+'<button onclick="closeModal()">やめる</button>');}
 function pickAwakeningAbility(id){if(awakeningPick===id)return;awakeningPick=id;renderAwakeningChoices();}
@@ -2322,7 +2334,7 @@ function renderRebirthAbilitySelect(){var cand=selectableAbilities();
 showModal('<h3>新しい第一異能を選ぶ</h3><p class="small">過去に習得した異能を再び選ぶと「異能＋1」となり、その異能効果がさらに5%強化される。<br>第二異能は、Lv50到達後の覚醒クエストで改めて奪う。</p>'+
 cand.map(function(a){var repeat=state.abilityAcquired&&state.abilityAcquired[a.id],chosen=rebirthAbilityPick===a.id,art=ABILITY_ART[a.id]||'';
 return '<div class="modal-ability-card'+(chosen&&art?' chosen':'')+'" role="button" tabindex="0" aria-pressed="'+(chosen?'true':'false')+'" onclick="pickRebirthAbility(\''+a.id+'\')" onkeydown="modalAbilityKey(event,\'rebirth\',\''+a.id+'\')">'+
-(chosen&&art?'<img class="ability-art" src="'+art+'" alt="'+a.name+'を発動する主人公" width="1024" height="1536" decoding="async">':'')+
+(chosen&&art?'<img class="ability-art" src="'+art+'" alt="'+a.name+'を発動する主人公" width="1024" height="1536" decoding="async" onerror="abilityArtError(this)">':'')+
 '<div class="ability-card-copy"><strong style="color:'+a.color+'">'+nextAbilityName(a.id)+'</strong><span class="desc">'+a.reading+' / '+a.role+'<br>'+a.desc+'<br>リソース：'+A_DATA[a.id].res+' ／ 継続ダメージ：'+A_DATA[a.id].dot+(repeat?'<br><span style="color:#ffd76b;">再習得ボーナス：異能効果＋5%</span>':'')+'</span>'+
 (chosen?'<span class="ability-selected-chip">選択中</span><button class="choice-confirm" onclick="event.stopPropagation();confirmRebirth(\''+a.id+'\')">この異能で転生する</button>':'')+'</div></div>';}).join('')+
 '<button onclick="renderCarrySelect()">スキル選択に戻る</button>');}
@@ -2360,6 +2372,7 @@ else passWasOn=on;
 safe(renderHeader);if(currentTab==='daily')safe(renderDaily);if(currentTab==='shop')safe(renderShop);}},5000);
 mergeFlavor();
 renderStart();
+installArtPreviewEntry();
 cloudInit().then(function(){renderStartContinue();if(state){scheduleCloudSave();fetchPvpProfiles(false);fetchPvpHistory(false);fetchPvpDailyStatus(false);}});
 </script>
 </body>
