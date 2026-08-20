@@ -143,7 +143,7 @@ var SAVE_KEY='ign_save_v1';
 var BACKUP_KEY='ign_save_backups_v1';
 var CLOUD_GAME_ID='inou_chronicle';
 var PVP_DATA_VERSION=2;
-var CLIENT_BUILD_VERSION=41;
+var CLIENT_BUILD_VERSION=42;
 var PVP_DAILY_LIMIT=5;
 var PVP_SEASON_ID='preseason-1';
 var SUPABASE_URL='https://ybbolpaerkhozzxlsvag.supabase.co';
@@ -1165,7 +1165,7 @@ function migrateAbilityMastery(s){if(s.abilityMastery&&s.abilityAcquired)return;
 var counts={};(s.abilityHistory||[]).concat([s.baseAbility,s.secondAbility]).forEach(function(id){if(id)counts[id]=(counts[id]||0)+1;});
 s.abilityMastery={};s.abilityAcquired={};Object.keys(counts).forEach(function(id){s.abilityAcquired[id]=true;s.abilityMastery[id]=Math.max(0,counts[id]-1);});}
 function migratePvpState(s){
- var old=s.pvp||{};s.pvp=Object.assign({dataVersion:PVP_DATA_VERSION,seasonId:PVP_SEASON_ID,rating:1000,seasonPoints:0,wins:0,losses:0,defenseWins:0,defenseLosses:0,winStreak:0,bestRating:1000,aiStyle:'balanced',defenseSnapshot:null,lastSnapshotAt:null,lastMatchAt:null,activeMatchId:null,lastResultText:''},old);
+ var old=s.pvp||{};s.pvp=Object.assign({dataVersion:PVP_DATA_VERSION,seasonId:PVP_SEASON_ID,rating:1000,seasonPoints:0,wins:0,losses:0,defenseWins:0,defenseLosses:0,winStreak:0,bestRating:1000,aiStyle:'balanced',defenseSnapshot:null,lastSnapshotAt:null,lastMatchAt:null,activeMatchId:null,pendingResult:null,lastResultError:'',lastResultText:''},old);
  s.pvp.dataVersion=PVP_DATA_VERSION;if(!s.pvp.seasonId)s.pvp.seasonId=PVP_SEASON_ID;
  if(['balanced','aggressive','defensive'].indexOf(s.pvp.aiStyle)<0)s.pvp.aiStyle='balanced';
 }
@@ -1177,7 +1177,7 @@ if(oldVersion<24){var rarityMap=[0,2,4,6];
 s.inventory.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});
 s.equipment.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});}
 if(oldVersion<33){s.inventory.concat(s.equipment).forEach(function(it){if(!it||it.reqLv==null)return;var cap=(REQ_BASE[it.rank]||1)+Math.floor((Number(it.rarity)||0)/3)+2;it.reqLv=Math.max(1,Math.min(Number(it.reqLv)||1,Math.min(100,cap)));});}
-s.dataVersion=37;
+s.dataVersion=38;
 s.currentGateIndex=clamp(s.currentGateIndex||0,0,GATES.length-1);s.pendingSkills=s.pendingSkills||[];s.battle=null;s.auto=false;s.debugGates=s.debugGates||false;
 s.stamina=s.stamina==null?100:s.stamina;s.staminaTs=s.staminaTs||serverTime();s.arenaPts=s.arenaPts||0;s.playerId=s.playerId||makeId();
 s.learned=s.learned||{first:[],second:[],integrated:[]};s.skillDone=s.skillDone||{first:[],second:[],integrated:[]};
@@ -1314,18 +1314,39 @@ async function beginServerPvpMatch(target){
  try{var res=await cloudClient.rpc('start_pvp_match_v3',{p_defender_id:target.userId,p_client_version:CLIENT_BUILD_VERSION});if(res.error)throw res.error;var d=res.data||null;if(!d||!d.match_id||!d.proof_token)throw new Error('invalid match proof');applyPvpDailyStatus({used:d.daily_used,remaining:d.daily_remaining},'サーバー管理');return d;}
  catch(e){logError(e);pvpStartError=String(e&&e.message||e);pvpOnlineStatus='対戦開始失敗（サーバー更新を確認）';await fetchPvpDailyStatus(false);return null;}
 }
-async function submitPvpResult(attackerWon,battle){
- var matchId=battle&&battle.enemy&&battle.enemy.matchId;if(!matchId||pvpResultBusy)return false;
- pvpResultBusy=true;migratePvpState(state);state.pvp.activeMatchId=matchId;state.pvp.lastResultText='結果送信中…';saveGame();if(currentTab==='daily')renderDaily();
+function waitMs(ms){return new Promise(function(resolve){setTimeout(resolve,ms);});}
+function applyPvpResultRow(row,attackerWon){
+ state.pvp.rating=Number(row.new_rating)||0;state.pvp.seasonPoints=Number(row.new_season_points)||0;state.pvp.wins=Number(row.total_wins)||0;state.pvp.losses=Number(row.total_losses)||0;state.pvp.bestRating=Math.max(state.pvp.bestRating||1000,state.pvp.rating);state.pvp.lastMatchAt=new Date().toISOString();state.pvp.activeMatchId=null;state.pvp.pendingResult=null;state.pvp.lastResultError='';
+ var delta=Number(row.rating_delta)||0;state.pvp.lastResultText=(attackerWon?'勝利':'敗北')+' / Rate '+(delta>=0?'+':'')+delta+' → '+state.pvp.rating;saveGame();
+}
+async function reconcilePendingPvp(matchId,attackerWon){
+ await fetchPvpProfiles(false);await fetchPvpHistory(false);await fetchPvpDailyStatus(false);
+ var done=pvpMatchHistory.find(function(m){return String(m.id)===String(matchId)&&m.status==='completed';});
+ if(!done)return false;
+ state.pvp.activeMatchId=null;state.pvp.pendingResult=null;state.pvp.lastResultError='';state.pvp.lastMatchAt=new Date().toISOString();state.pvp.lastResultText=(attackerWon?'勝利':'敗北')+' / サーバー反映済み';saveGame();return true;
+}
+async function sendPendingPvpResult(showResult){
+ if(!state||pvpResultBusy)return false;migratePvpState(state);var pending=state.pvp.pendingResult;if(!pending||!pending.matchId)return true;
+ pvpResultBusy=true;state.pvp.lastResultText='結果を送信中…';saveGame();if(currentTab==='daily')renderDaily();var lastError=null;
  try{
-  var audit=battle.pvpAudit||{};
-  var payload={proof_token:String(battle.enemy.proofToken||''),client_version:CLIENT_BUILD_VERSION,action_count:Math.max(0,Number(audit.actions)||0),duration_ms:Math.max(0,Date.now()-(Number(audit.startedAt)||Date.now())),attacker_start_hp:Math.max(1,Number(audit.attackerStartHp)||1),defender_start_hp:Math.max(1,Number(audit.defenderStartHp)||1),attacker_end_hp:Math.max(0,Number(state.hp)||0),defender_end_hp:Math.max(0,Number(battle.enemy.hp)||0)};
-  var res=await cloudClient.rpc('finish_pvp_match_v2',{p_match_id:matchId,p_attacker_won:!!attackerWon,p_result:payload});if(res.error)throw res.error;
-  var row=Array.isArray(res.data)?res.data[0]:res.data;if(!row)throw new Error('empty pvp result');
-  state.pvp.rating=Number(row.new_rating)||0;state.pvp.seasonPoints=Number(row.new_season_points)||0;state.pvp.wins=Number(row.total_wins)||0;state.pvp.losses=Number(row.total_losses)||0;state.pvp.bestRating=Math.max(state.pvp.bestRating||1000,state.pvp.rating);state.pvp.lastMatchAt=new Date().toISOString();state.pvp.activeMatchId=null;
-  var delta=Number(row.rating_delta)||0;state.pvp.lastResultText=(attackerWon?'勝利':'敗北')+' / Rate '+(delta>=0?'+':'')+delta+' → '+state.pvp.rating;saveGame();await fetchPvpProfiles(false);await fetchPvpHistory(false);await fetchPvpDailyStatus(false);showMessage('オンライン対戦結果',state.pvp.lastResultText+'<br>シーズンPt '+state.pvp.seasonPoints+'<br>戦績 '+state.pvp.wins+'勝 '+state.pvp.losses+'敗<br>本日の残り '+pvpDailyRemaining+'回');return true;
- }catch(e){logError(e);state.pvp.lastResultText='結果送信失敗（再送不可・端末戦闘は完了）';saveGame();showMessage('PVP結果送信失敗','通信またはサーバー処理に失敗しました。Rateは変更していません。連打せず、次の対戦前にランキングを更新してください。');return false;}
- finally{pvpResultBusy=false;if(currentTab==='daily')renderDaily();}
+  for(var attempt=0;attempt<3;attempt++){
+   if(attempt>0)await waitMs(attempt===1?800:1800);
+   try{
+    if(!cloudReady&&!(await cloudInit()))throw new Error('cloud unavailable');
+    var res=await cloudClient.rpc('finish_pvp_match_v2',{p_match_id:pending.matchId,p_attacker_won:!!pending.attackerWon,p_result:pending.payload});if(res.error)throw res.error;
+    var row=Array.isArray(res.data)?res.data[0]:res.data;if(!row)throw new Error('empty pvp result');
+    applyPvpResultRow(row,!!pending.attackerWon);await fetchPvpProfiles(false);await fetchPvpHistory(false);await fetchPvpDailyStatus(false);
+    if(showResult)showMessage('オンライン対戦結果',state.pvp.lastResultText+'<br>シーズンPt '+state.pvp.seasonPoints+'<br>戦績 '+state.pvp.wins+'勝 '+state.pvp.losses+'敗<br>本日の残り '+pvpDailyRemaining+'回');return true;
+   }catch(e){lastError=e;logError(e);}
+  }
+  if(await reconcilePendingPvp(pending.matchId,!!pending.attackerWon)){if(showResult)showMessage('PVP結果確認','通信応答は途切れましたが、結果はサーバーへ反映済みでした。');return true;}
+  state.pvp.lastResultError=String(lastError&&lastError.message||lastError||'不明').slice(0,160);state.pvp.lastResultText='結果送信を保留中（再送できます）';saveGame();if(showResult)showMessage('PVP結果を保留しました','通信またはサーバー処理に失敗しました。結果は端末へ保存しています。<br><br>通信状態を確認し、アリーナ画面の「保留結果を再送」を押してください。<br><br><span class="small">エラー：'+cloudEsc(state.pvp.lastResultError)+'</span>');return false;
+ }finally{pvpResultBusy=false;if(currentTab==='daily')renderDaily();}
+}
+async function submitPvpResult(attackerWon,battle){
+ var matchId=battle&&battle.enemy&&battle.enemy.matchId;if(!matchId||pvpResultBusy)return false;migratePvpState(state);var audit=battle.pvpAudit||{};
+ var payload={proof_token:String(battle.enemy.proofToken||''),client_version:CLIENT_BUILD_VERSION,action_count:Math.max(0,Number(audit.actions)||0),duration_ms:Math.max(0,Date.now()-(Number(audit.startedAt)||Date.now())),attacker_start_hp:Math.max(1,Number(audit.attackerStartHp)||1),defender_start_hp:Math.max(1,Number(audit.defenderStartHp)||1),attacker_end_hp:Math.max(0,Number(state.hp)||0),defender_end_hp:Math.max(0,Number(battle.enemy.hp)||0)};
+ state.pvp.activeMatchId=matchId;state.pvp.pendingResult={matchId:matchId,attackerWon:!!attackerWon,payload:payload,savedAt:new Date().toISOString()};saveGame();return sendPendingPvpResult(true);
 }
 function renderStart(){document.getElementById('abilityList').innerHTML=ABILITIES.filter(function(ab){return!isHidden(ab.id);}).map(function(ab){var d=A_DATA[ab.id];
 var chosen=selectedAbility===ab.id,art=ABILITY_ART[ab.id]||'';
@@ -1354,10 +1375,10 @@ if(!name){showMessage('名前未入力','キャラクター名を入力してく
 if(!selectedAbility){showMessage('異能未選択','リストから初期異能を1つ選択してください。');return;}
 if(hasSave()&&!safeConfirm('既存のセーブデータを上書きして新しく始めますか？'))return;
 tierCache={};
-state={dataVersion:37,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
+state={dataVersion:38,name:name,phase:'first',baseAbility:selectedAbility,secondAbility:null,integratedName:null,level:1,exp:0,hp:100,rank:'F',rebirth:0,statPoints:0,
 alloc:{str:0,vit:0,def:0,agi:0,pow:0},currentGateIndex:0,stamina:100,staminaTs:serverTime(),hpTs:serverTime(),arenaPts:0,playerId:makeId(),auto:false,debugGates:false,
 learned:{first:[],second:[],integrated:[]},skillDone:{first:[],second:[],integrated:[]},
-inventory:[],equipment:[null,null,null],tut:{battles:0,gotItem:false,guideDone:false},frags:{},carriedSkills:[],abilityHistory:[],abilityMastery:{},abilityAcquired:{},titles:[],activeTitle:null,gold:CONFIG.START_GOLD,potions:CONFIG.START_POTIONS,iap:{noAds:false,passUntil:0,testPurchaseCleanupV1:true},gateProgress:{},absorbed:[],pendingSkills:[],battle:null,bots:null,pvpTarget:null,pvp:{dataVersion:PVP_DATA_VERSION,seasonId:PVP_SEASON_ID,rating:1000,seasonPoints:0,wins:0,losses:0,defenseWins:0,defenseLosses:0,winStreak:0,bestRating:1000,aiStyle:'balanced',defenseSnapshot:null,lastSnapshotAt:null,lastMatchAt:null,activeMatchId:null,lastResultText:''},unlockedHidden:[],hiddenNotices:[],storySeen:{},storyNotices:[],totalWins:0};
+inventory:[],equipment:[null,null,null],tut:{battles:0,gotItem:false,guideDone:false},frags:{},carriedSkills:[],abilityHistory:[],abilityMastery:{},abilityAcquired:{},titles:[],activeTitle:null,gold:CONFIG.START_GOLD,potions:CONFIG.START_POTIONS,iap:{noAds:false,passUntil:0,testPurchaseCleanupV1:true},gateProgress:{},absorbed:[],pendingSkills:[],battle:null,bots:null,pvpTarget:null,pvp:{dataVersion:PVP_DATA_VERSION,seasonId:PVP_SEASON_ID,rating:1000,seasonPoints:0,wins:0,losses:0,defenseWins:0,defenseLosses:0,winStreak:0,bestRating:1000,aiStyle:'balanced',defenseSnapshot:null,lastSnapshotAt:null,lastMatchAt:null,activeMatchId:null,pendingResult:null,lastResultError:'',lastResultText:''},unlockedHidden:[],hiddenNotices:[],storySeen:{},storyNotices:[],totalWins:0};
 acquireAbility(selectedAbility);
 resetDailyOn(state);state.hp=getStats().hp;updateRank();
 hideStartScreen();document.getElementById('mainScreen').style.display='block';renderAll();showStory();}
@@ -1540,6 +1561,7 @@ return{name:'【アリーナ】'+(bot?bot.name:'???'),type:'pvp',fxKey:'__arena'
 atk:atk,def:def,crit:ss?Number(ss.crit)||12:12,dodge:ss?Number(ss.dodge)||10:10,speed:ss?Number(ss.speed)||12:12+Math.floor(p/300),burn:0,stun:0,online:!!(bot&&bot.online),opponentUserId:bot&&bot.userId||null,opponentRating:bot&&bot.rating||1000,aiStyle:style,matchId:bot&&bot.matchId||null,proofToken:bot&&bot.proofToken||null};}
 async function startPvp(targetUserId){
  if(pvpMatchBusy||pvpResultBusy)return;if(state.pendingSkills.length){processPendingSkills();return;}if(state.battle&&!state.battle.over){switchTab('battle');return;}
+ if(state.pvp&&state.pvp.pendingResult){if(!(await sendPendingPvpResult(true)))return;}
  pvpMatchBusy=true;try{
   await fetchPvpDailyStatus(false);
   if(pvpDailyRemaining<=0){showMessage('本日の対戦回数を使い切りました','アリーナは1日'+PVP_DAILY_LIMIT+'回までです。<br>日本時間0時に回復します。<br><br>探索スタミナは消費しません。');return;}
@@ -2142,7 +2164,7 @@ if(mi.reward.potion){var pn=Math.round(mi.reward.potion*bm);state.potions=(state
 if(mi.reward.item){var it=makeItem(getCurrentGate(),true,mi.reward.item);addItem(it,true);got.push('【'+RARITIES[it.rarity].n+'】'+it.name);}
 renderAll();showMessage('ミッション達成',mi.name+'<br><br>受け取り：'+got.join(' / '));}
 function renderRanking(){ensureBots();var src=pvpOnlineProfiles.length?pvpOnlineProfiles:(state.bots||[]);var rows=src.map(function(b){return{userId:b.userId||'',name:b.name,power:b.power,rating:b.rating||1000,online:!!b.online,me:false};}).concat([{userId:'',name:state.name,power:playerPower(),rating:state.pvp.rating||1000,online:pvpOnlineProfiles.length>0,me:true}]).sort(function(a,b){return a.online||b.online?(b.rating-a.rating)||(b.power-a.power):b.power-a.power;}).slice(0,10);
-return rows.map(function(r,i){var challenge=r.online&&!r.me?'<button class="primary" onclick="startPvp(\''+cloudEsc(r.userId)+'\')" '+((pvpDailyRemaining<=0||pvpMatchBusy||pvpResultBusy||(state.battle&&!state.battle.over))?'disabled':'')+'>挑戦</button>':'';return '<div class="item-row"><div class="item-info">'+(i+1)+'. <span style="'+(r.me?'color:#ffd76b;font-weight:700':'')+'">'+cloudEsc(r.name)+(r.me?'(あなた)':'')+'</span><div class="small">戦力 '+r.power+(r.online?' / Rate '+r.rating:' / BOT')+'</div></div>'+challenge+'</div>';}).join('');}
+return rows.map(function(r,i){var challenge=r.online&&!r.me?'<button class="primary" onclick="startPvp(\''+cloudEsc(r.userId)+'\')" '+((pvpDailyRemaining<=0||pvpMatchBusy||pvpResultBusy||(state.pvp&&state.pvp.pendingResult)||(state.battle&&!state.battle.over))?'disabled':'')+'>挑戦</button>':'';return '<div class="item-row"><div class="item-info">'+(i+1)+'. <span style="'+(r.me?'color:#ffd76b;font-weight:700':'')+'">'+cloudEsc(r.name)+(r.me?'(あなた)':'')+'</span><div class="small">戦力 '+r.power+(r.online?' / Rate '+r.rating:' / BOT')+'</div></div>'+challenge+'</div>';}).join('');}
 function renderDaily(){regenStamina();var d=state.daily;var w=state.world;
 if(WORLD_BOSS_SIMULATION){w.hp=worldHp();}
 var inBattle=state.battle&&!state.battle.over;
@@ -2164,7 +2186,8 @@ return '<div class="item-row"><div class="item-info">'+mi.name+'<div class="smal
 '<div class="small" style="margin-top:6px;">あなたの貢献：'+(w.contrib||0)+'% / '+(WORLD_BOSS_SIMULATION?'他覚醒者も同時攻撃中(シミュレート)':'サーバー共有HP')+'</div>'+
 '<button style="margin-top:8px;" onclick="startBattle(\'world\')" '+((w.rewarded||inBattle)?'disabled':'')+'>'+(w.rewarded?'報酬受取済':'討伐参加('+COST.world+')')+'</button></div>'+
 '<div class="card"><h3 style="margin-top:0;">アリーナ（オンライン候補＋BOT）</h3><div class="small">アリーナPt：'+state.arenaPts+' / Rate：'+state.pvp.rating+' / シーズンPt：'+state.pvp.seasonPoints+'</div><div class="small">戦績：'+state.pvp.wins+'勝 '+state.pvp.losses+'敗 / 防衛：'+state.pvp.defenseWins+'勝 '+state.pvp.defenseLosses+'敗 / サーバー：'+pvpOnlineStatus+'</div><div class="small" style="margin-top:6px;color:#8fe3ff;">本日の対戦：'+pvpDailyUsed+'/'+PVP_DAILY_LIMIT+'回（残り'+pvpDailyRemaining+'回） / 日本時間0時更新 / スタミナ消費なし</div><div class="small">同じ相手への挑戦は1日3回まで。防衛戦は回数を消費しません。回数管理：'+cloudEsc(pvpDailyStatus)+'</div>'+(state.pvp.lastResultText?'<div class="small" style="margin-top:5px;color:#8fe3ff;">直近：'+cloudEsc(state.pvp.lastResultText)+'</div>':'')+
-'<button style="margin-top:8px;" onclick="startPvp()" '+((pvpDailyRemaining<=0||inBattle||pvpMatchBusy||pvpResultBusy)?'disabled':'')+'>'+(pvpMatchBusy?'対戦相手を準備中…':pvpResultBusy?'結果送信中…':'対戦（残り'+pvpDailyRemaining+'回）')+'</button>'+
+'<button style="margin-top:8px;" onclick="startPvp()" '+((pvpDailyRemaining<=0||inBattle||pvpMatchBusy||pvpResultBusy||(state.pvp&&state.pvp.pendingResult))?'disabled':'')+'>'+(pvpMatchBusy?'対戦相手を準備中…':pvpResultBusy?'結果送信中…':(state.pvp&&state.pvp.pendingResult)?'保留結果を先に再送してください':'対戦（残り'+pvpDailyRemaining+'回）')+'</button>'+
+((state.pvp&&state.pvp.pendingResult)?'<button class="primary" style="margin-top:8px;" onclick="sendPendingPvpResult(true)" '+(pvpResultBusy?'disabled':'')+'>保留結果を再送</button>':'')+
 '<button style="margin-top:8px;" onclick="fetchPvpProfiles(true)" '+(pvpOnlineLoading?'disabled':'')+'>対戦相手・ランキングを更新</button>'+
 '<h3 style="margin:14px 0 6px;">ランキング</h3>'+renderRanking()+'<hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;">'+
 '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><h3 style="margin:0;">PVP対戦履歴</h3><button onclick="fetchPvpHistory(true)" '+(pvpHistoryLoading?'disabled':'')+'>'+(pvpHistoryLoading?'取得中…':'履歴更新')+'</button></div><div class="small" style="margin:5px 0 8px;">攻撃戦と、他プレイヤーから挑戦された防衛戦を新しい順に表示します。</div>'+renderPvpHistory()+'<hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;">'+
