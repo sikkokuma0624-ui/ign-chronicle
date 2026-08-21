@@ -2,7 +2,12 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>異能ゲート・クロニクル v40</title>
+<meta name="description" content="異能を選び、ゲートを攻略して最強を目指す無料ブラウザ育成RPG。">
+<meta name="theme-color" content="#0b0b10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="異能クロニクル">
+<title>異能ゲート・クロニクル</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b0b10;color:#e8e6f0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;line-height:1.5}
 #app{max-width:760px;margin:0 auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom))}
@@ -78,7 +83,7 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 <body>
 <div id="app">
 <section id="startScreen">
-<h1>異能ゲート・クロニクル <span class="small">v40</span></h1>
+<h1>異能ゲート・クロニクル <span class="small">β版</span></h1>
 <div class="card"><h2>キャラクター作成</h2>
 <p class="small">名前を入力し、10種の初期異能から1つ選択してください。世界には、条件を満たした者だけが発見できる5つの隠し異能も存在します。</p>
 <input id="playerNameInput" type="text" maxlength="12" placeholder="名前を入力" style="width:100%;font-size:18px;padding:12px;border-radius:12px;border:1px solid #444;background:#0d0d13;color:#fff;margin-bottom:6px;"></div>
@@ -143,7 +148,7 @@ var SAVE_KEY='ign_save_v1';
 var BACKUP_KEY='ign_save_backups_v1';
 var CLOUD_GAME_ID='inou_chronicle';
 var PVP_DATA_VERSION=2;
-var CLIENT_BUILD_VERSION=43;
+var CLIENT_BUILD_VERSION=44;
 var PVP_DAILY_LIMIT=5;
 var PVP_SEASON_ID='preseason-1';
 var SUPABASE_URL='https://ybbolpaerkhozzxlsvag.supabase.co';
@@ -1078,7 +1083,9 @@ function deleteSave(){try{localStorage.removeItem(SAVE_KEY);}catch(e){}}
 function renderCloudStartButton(){var a=document.getElementById('continueArea');if(!a)return;renderStartContinue();}
 function renderStartContinue(){
  var a=document.getElementById('continueArea');if(!a)return;
- var h=hasSave()?'<button class="primary" style="width:100%;margin-bottom:10px;" onclick="continueGame()">端末データで続きから</button><button style="width:100%;margin-bottom:10px;" onclick="resetSave()">最初からやり直す（端末データ削除）</button>':'';
+ var local=loadGame(),hasRaw=hasSave(),backup=latestRecoveryBackup();
+ var h=local?'<button class="primary" style="width:100%;margin-bottom:10px;" onclick="continueGame()">端末データで続きから</button><button style="width:100%;margin-bottom:10px;" onclick="resetSave()">最初からやり直す（端末データ削除）</button>':hasRaw?'<div class="card guide"><strong>端末セーブを読み込めません</strong><div class="small" style="margin-top:6px;">緊急バックアップから復元するか、最初からやり直してください。</div></div><button style="width:100%;margin-bottom:10px;" onclick="resetSave()">最初からやり直す（破損データ削除）</button>':'';
+ if(backup)h+='<button style="width:100%;margin-bottom:10px;border-color:#ffd76b;" onclick="restoreRecoveryBackup()">緊急バックアップから復元<br><span class="small">'+cloudTimeText(backup.savedAt)+'</span></button>';
  if(cloudRemoteSave&&cloudRemoteSave.save_data)h+='<button style="width:100%;margin-bottom:10px;border-color:#8f6bff;" onclick="cloudLoadFromStart()">クラウドから復元<br><span class="small">'+cloudTimeText(cloudRemoteSave.updated_at)+'</span></button>';
  h+='<div class="small" style="margin-bottom:14px;">クラウド：'+cloudStatus+'</div>';
  if(cloudIsAnonymous())h+='<div style="margin-top:14px;padding:16px;border:1px solid #30303f;border-radius:14px;background:#12121a;text-align:left;"><strong>登録済みの方・別端末から引き継ぐ</strong><div class="small" style="margin:6px 0 10px;">登録済みメールアドレスへログインリンクを送ります。メール内のリンクを押すとクラウドセーブを復元できます。</div><input id="startLoginEmail" type="email" autocomplete="email" placeholder="登録済みメールアドレス" style="width:100%;font-size:16px;padding:12px;border-radius:10px;border:1px solid #444;background:#0d0d13;color:#fff;margin:0 0 8px;"><button style="width:100%;" onclick="sendCloudLoginLink(\'startLoginEmail\')">ログインリンクを送る</button></div>';
