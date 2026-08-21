@@ -43,6 +43,7 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 .muted{color:#9a97b0}.progress-label{display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px}.story-text{font-size:17px;line-height:1.9}
 .dbg{border:1px dashed #ff4d6d}
 .lock-card{opacity:.78;border-style:dashed}.guide{border-color:#ffd76b;box-shadow:0 0 0 1px #ffd76b inset}.story-chip{display:inline-block;padding:5px 9px;border-radius:999px;background:#2b2340;color:#d7c4ff;font-size:12px;margin:3px}
+.guide-step{border-left:3px solid #8f6bff;padding:8px 10px;margin:10px 0;background:#161620;border-radius:0 10px 10px 0}.guide-step strong{display:block;color:#e8dcff;margin-bottom:3px}.update-entry{padding:10px 0;border-bottom:1px solid #2c2c3a}.update-entry:last-child{border-bottom:0}.update-tag{display:inline-block;margin-right:6px;padding:2px 7px;border-radius:999px;background:#2b2340;color:#d7c4ff;font-size:11px;font-weight:800}
 #startScreen{position:fixed;inset:0;z-index:60;background:#0b0b10;overflow-y:auto;padding:16px 12px calc(24px + env(safe-area-inset-bottom));}
 .abilityCard{position:relative;overflow:hidden;cursor:pointer;transition:min-height .22s ease,border-color .18s ease,box-shadow .18s ease;padding:14px;isolation:isolate}
 .abilityCard:focus-visible{outline:2px solid #b79cff;outline-offset:2px}
@@ -84,6 +85,9 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 <div id="app">
 <section id="startScreen">
 <h1>異能ゲート・クロニクル <span class="small">β版</span></h1>
+<div class="card guide"><h2 style="margin-top:0;">世界を裂く門と、魂に宿る異能</h2>
+<p class="story-text" style="font-size:15px;line-height:1.75;">異界へ通じる「ゲート」が出現した世界で、覚醒者となって怪物を討つ育成RPGです。異能ごとに異なる戦い方を組み立て、第二異能の獲得、二つの力の統合、そして転生の先を目指します。</p>
+<div class="small">◆ 1戦ずつ進められる文章バトル　◆ 15種の異能（隠し5種）　◆ 装備・スキル・物語・アリーナ</div></div>
 <div class="card"><h2>キャラクター作成</h2>
 <p class="small">名前を入力し、10種の初期異能から1つ選択してください。世界には、条件を満たした者だけが発見できる5つの隠し異能も存在します。</p>
 <input id="playerNameInput" type="text" maxlength="12" placeholder="名前を入力" style="width:100%;font-size:18px;padding:12px;border-radius:12px;border:1px solid #444;background:#0d0d13;color:#fff;margin-bottom:6px;"></div>
@@ -148,7 +152,7 @@ var SAVE_KEY='ign_save_v1';
 var BACKUP_KEY='ign_save_backups_v1';
 var CLOUD_GAME_ID='inou_chronicle';
 var PVP_DATA_VERSION=2;
-var CLIENT_BUILD_VERSION=45;
+var CLIENT_BUILD_VERSION=46;
 var PVP_DAILY_LIMIT=5;
 var PVP_SEASON_ID='preseason-1';
 var SUPABASE_URL='https://ybbolpaerkhozzxlsvag.supabase.co';
@@ -1389,12 +1393,18 @@ inventory:[],equipment:[null,null,null],tut:{battles:0,gotItem:false,guideDone:f
 acquireAbility(selectedAbility);
 resetDailyOn(state);state.hp=getStats().hp;updateRank();
 hideStartScreen();document.getElementById('mainScreen').style.display='block';renderAll();showStory();}
-function showStory(){showModal('<h2>覚醒</h2><div class="story-text">空が、最初に割れたのは東京だった。<br><br>世界各地に「ゲート」と呼ばれる亀裂が現れ、異界からモンスターが溢れ出した。<br><br>同時に、一部の人間は魂に眠る異能へ覚醒し始める。<br><br>'+state.name+'。<br>お前の眼前にも、半透明のステータスウィンドウが浮かんでいる。<br><br>【メインクエスト発生】<br>モンスターを狩り、ゲートを閉じ、世界を救え。<br>そして――最強になれ。</div><button class="primary" onclick="startTutorial(0)">受け入れる</button>');}
+var PROLOGUE=[
+{t:'序章　門が開いた日',b:'空が最初に割れたのは、東京だった。<br><br>黒い亀裂――後に「ゲート」と呼ばれる門から、こちらの理が通じない怪物が溢れ出した。都市は封鎖され、昨日までの日常は、たった一夜で過去になった。'},
+{t:'覚醒者',b:'怪物に対抗できたのは、魂に異能を宿した者だけだった。<br><br>炎、時間、因果、言葉。力の形は覚醒者ごとに異なり、その代償もまた異なる。人々は彼らに希望を託し、同時に恐れた。'},
+{t:'あなたの物語',b:'崩れた街の奥で、一つのゲートが脈打っている。半透明の画面が、あなたの名を呼んだ。<br><br>【覚醒を確認】<br>【第一異能を登録】<br>【メインクエスト：門の最深部へ到達せよ】<br><br>ここから先、選んだ力が戦い方と物語を変える。門を閉じるのか。その向こうへ進むのか。答えは、まだ誰も知らない。'}];
+function showStory(){openPrologue(0,true);}
+function openPrologue(i,firstRun){var x=PROLOGUE[i];if(!x){if(firstRun)startTutorial(0);else closeModal();return;}showModal('<h2>'+x.t+'</h2><div class="story-text">'+x.b+'</div><button class="primary" onclick="openPrologue('+(i+1)+','+(firstRun?'true':'false')+')">'+(i===PROLOGUE.length-1?(firstRun?'覚醒を受け入れる':'閉じる'):'次へ')+'</button>');}
 var TUTORIAL=[
-{t:'1／4　探索',b:'まず「探索」タブでF級ゲートを選び、通常戦闘を開始します。敵を倒すとゲートの討伐数が進み、最後にボスが出現します。'},
-{t:'2／4　戦闘',b:'通常攻撃で専用リソースを溜め、異能起動や習得スキルで使います。危険な時は防御・治癒薬・撤退も選べます。'},
-{t:'3／4　育成',b:'レベルアップでステータスポイントとスキル選択が発生します。入手装備は「装備」、物語と解放条件は「記録」で確認できます。'},
-{t:'4／4　長期目標',b:'第一異能Lv50で第二異能を獲得し、さらに統合覚醒へ進みます。5つの隠し異能は、記録に示された条件を満たすと解放されます。'}];
+{t:'1／5　探索して敵を見つける',b:'「探索」タブでF級ゲートを選び、通常戦闘を始めます。敵を倒すたびに討伐数が進み、規定数を倒すとゲートボスへ挑戦できます。探索とボス戦ではスタミナを消費します。'},
+{t:'2／5　異能で戦う',b:'通常攻撃で、選んだ異能専用のリソースを溜めます。リソースが足りたら「異能起動」やスキルを使用できます。敵の大技予告が出た時は、防御も有効です。'},
+{t:'3／5　負けても立て直せる',b:'危険な時は治癒薬で回復するか、撤退できます。敗北してもゲーム終了にはなりません。装備を見直し、レベルを上げ、もう一度挑戦してください。'},
+{t:'4／5　キャラクターを育てる',b:'レベルアップでステータスポイントと、新しいスキルの選択が発生します。拾った装備は「装備」、能力値は「ステータス」、物語や隠し異能の条件は「記録」で確認できます。'},
+{t:'5／5　目指す場所',b:'第一異能をLv50まで育てると、第二異能を獲得する覚醒クエストが始まります。その先では二つの異能を統合し、さらに転生して新しい力を選べます。デイリーやアリーナは、基本操作に慣れてから挑戦してください。'}];
 function startTutorial(i){var x=TUTORIAL[i];if(!x){state.tut.guideDone=true;state.storyNotices=[0];closeModal();processStoryNotices();return;}showModal('<h2>'+x.t+'</h2><div class="story-text">'+x.b+'</div><button class="primary" onclick="startTutorial('+(i+1)+')">'+(i===TUTORIAL.length-1?'物語を始める':'次へ')+'</button>');}
 function showModal(h){document.getElementById('modalContent').innerHTML=h;document.getElementById('modal').style.display='flex';}
 function closeModal(){document.getElementById('modal').style.display='none';}
@@ -2298,7 +2308,19 @@ function renderRecord(){var ab=state.absorbed.length?state.absorbed.map(function
 var sc=storyChapters(state.baseAbility),avail=availableStoryCount();
 var story='<div class="card"><h3 style="margin-top:0;">第一異能物語</h3><div class="small">選んだ第一異能によって展開する専用記録。Lv15・Lv35で続きが解放される。</div><div style="margin-top:8px;">'+sc.map(function(c,i){return i<avail?'<button class="story-chip" onclick="openStoryChapter('+i+',false)">'+c.title+'</button>':'<span class="story-chip" style="opacity:.4;">？？？（Lv'+c.lv+'）</span>';}).join('')+'</div></div>';
 var hidden='<div class="card"><h3 style="margin-top:0;">未確認異能（'+(state.unlockedHidden||[]).length+' / 5）</h3><div class="small">条件達成で恒久解放。解放後は転生時または異能覚醒クエストで選べる。</div>'+HIDDEN_IDS.map(function(id){var a=getAbilityById(id),on=hiddenUnlocked(id);return '<div class="item-row"><div class="item-info"><strong style="color:'+(on?a.color:'#777')+'">'+(on?a.name:'？？？')+'</strong><div class="small">'+HIDDEN_RULES[id].hint+'</div></div><span class="small" style="color:'+(on?'#7dffb0':'#9a97b0')+'">'+(on?'解放済み':'未解放')+'</span></div>';}).join('')+'</div>';
-var guide='<div class="card"><h3 style="margin-top:0;">遊び方</h3><div class="small">操作や進行をもう一度確認できます。</div><button style="width:100%;margin-top:8px;" onclick="startTutorial(0)">チュートリアルを再表示</button></div>';
+var guide='<div class="card guide"><h3 style="margin-top:0;">遊び方</h3><div class="small">迷った時は、この順番で進めてください。</div>'+
+'<div class="guide-step"><strong>① 探索 → 通常戦闘</strong><span class="small">敵を倒して討伐数と経験値を獲得。通常攻撃で専用リソースを溜め、異能やスキルで決着をつける。</span></div>'+
+'<div class="guide-step"><strong>② ゲートボスを撃破</strong><span class="small">規定討伐数に達したらボスへ挑戦。勝利すると次のゲートが開き、より高ランクの装備を狙える。</span></div>'+
+'<div class="guide-step"><strong>③ レベル・装備・スキルを強化</strong><span class="small">ステータスポイントを割り振り、装備を更新。敵の大技には防御、危険時には治癒薬や撤退を使う。</span></div>'+
+'<div class="guide-step"><strong>④ Lv50で第二異能へ</strong><span class="small">覚醒クエストに勝つと第二異能を獲得。その異能をLv50まで育てると、二つの力を統合できる。</span></div>'+
+'<div class="guide-step"><strong>⑤ 統合異能・転生・隠し異能</strong><span class="small">統合後はLv100が目標。転生では一部スキルを持ち越して別の異能を選べる。隠し異能の条件は下の「未確認異能」で確認。</span></div>'+
+'<div class="small" style="margin-top:10px;color:#8fe3ff;">セーブは端末へ自動保存されます。メール連携後はクラウドセーブも利用できます。</div>'+
+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;"><button onclick="openPrologue(0,false)">序章を読む</button><button onclick="startTutorial(0)">操作説明を見る</button></div></div>';
+var updates='<div class="card"><h3 style="margin-top:0;">更新履歴</h3>'+
+'<div class="update-entry"><span class="update-tag">β Build 46</span><strong>案内・物語を強化</strong><div class="small">ゲーム説明、3幕の序章、詳しい遊び方、更新履歴を追加。</div></div>'+
+'<div class="update-entry"><span class="update-tag">β Build 45</span><strong>公開向け表示を整理</strong><div class="small">共同討伐演習や購入準備中の案内を整備し、開発者向け表記を削除。</div></div>'+
+'<div class="update-entry"><span class="update-tag">β Build 44</span><strong>セーブ復旧を強化</strong><div class="small">端末データ・緊急バックアップ・クラウドから復元できる開始画面を追加。</div></div>'+
+'<div class="update-entry"><span class="update-tag">β Build 43</span><strong>アリーナ結果送信を改善</strong><div class="small">全行動の記録と、通信失敗時の保留結果再送に対応。</div></div></div>';
 var cg=GATES.filter(function(g){return state.gateProgress[g.name]&&state.gateProgress[g.name].cleared;});
 var ch=cg.length?cg.map(function(g){return '<div class="card">'+g.name+'</div>';}).join(''):'<p class="small">まだ完全クリアしたゲートはない。</p>';
 var owned=state.titles||[];
@@ -2317,7 +2339,7 @@ return '<div style="margin-bottom:12px;"><strong style="color:#ffd76b;">'+S.name
 return '<span class="chip '+(owned2?'chosen':'dim')+'">'+(owned2?p.name:'？？？')+'</span>';}).join('')+'</div>'+
 '<div class="small" style="margin-top:4px;color:'+(eq>=2?'#ffd76b':'#9a97b0')+'">2部位：'+S.bonus2.label+'</div>'+
 '<div class="small" style="color:'+(eq>=3?'#ffd76b':'#9a97b0')+'">3部位：'+S.bonus3.label+'</div></div>';}).join('')+'</div>';
-document.getElementById('recordContent').innerHTML=story+hidden+guide+th+sets+'<div class="card"><h3 style="margin-top:0;">異能録</h3></div>'+ab+'<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">完全クリア済みゲート</h3></div>'+ch;}
+document.getElementById('recordContent').innerHTML=guide+story+hidden+updates+th+sets+'<div class="card"><h3 style="margin-top:0;">異能録</h3></div>'+ab+'<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">完全クリア済みゲート</h3></div>'+ch;}
 var awakeningPick=null;
 function openAwakening(){if(state.phase!=='first'||state.level<50)return;awakeningPick=null;renderAwakeningChoices();}
 function renderAwakeningChoices(){var rv=selectableAbilities().filter(function(a){return a.id!==state.baseAbility;});
