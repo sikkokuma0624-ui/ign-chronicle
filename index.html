@@ -14,6 +14,7 @@
 h1,h2,h3{line-height:1.25}button{appearance:none;border:1px solid #444;background:#171722;color:#e8e6f0;border-radius:12px;padding:12px 14px;font-size:16px;min-height:48px;cursor:pointer}
 button:active{transform:scale(.99)}button.primary{background:linear-gradient(135deg,#4b2f8f,#7b5bff);border-color:#8f6bff;font-weight:700}
 button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.45;cursor:not-allowed}
+.button-link{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;padding:12px 14px;border:1px solid #444;border-radius:12px;background:#171722;color:#e8e6f0;text-decoration:none;font-size:16px;text-align:center}.button-link:active{transform:scale(.99)}.button-link.feedback{border-color:#57c7ff;color:#8fe3ff;background:#10202a;font-weight:800}
 .card{background:#12121a;border:1px solid #2c2c3a;border-radius:16px;padding:14px;margin-bottom:12px}
 .card.selected{border-color:#8f6bff;box-shadow:0 0 0 1px #8f6bff inset}.small{font-size:13px;color:#9a97b0}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.tabs button{flex:1 1 auto;min-width:52px;padding:10px 4px;font-size:13px}
@@ -94,6 +95,7 @@ button.danger{background:#351018;border-color:#ff4d6d}button:disabled{opacity:.4
 <div id="continueArea"></div>
 <div id="abilityList"></div>
 <button id="startButton" class="primary" style="width:100%;" onclick="startGame()">覚醒する</button>
+<a class="button-link feedback" style="margin-top:10px;" href="https://docs.google.com/forms/d/e/1FAIpQLScprbnp_kuFLwACaEhl5wj1583nHsMqIxV5AzDFrKJpYrvHKQ/viewform?usp=publish-editor" target="_blank" rel="noopener noreferrer">不具合・ご意見を報告</a>
 <div class="small" style="text-align:center;margin-top:12px;"><button onclick="showLegalPage('terms')">利用規約</button> <button onclick="showLegalPage('privacy')">プライバシーポリシー</button> <button onclick="showLegalPage('commerce')">特定商取引法に基づく表記</button></div>
 </section>
 <section id="mainScreen" style="display:none;">
@@ -152,12 +154,13 @@ var SAVE_KEY='ign_save_v1';
 var BACKUP_KEY='ign_save_backups_v1';
 var CLOUD_GAME_ID='inou_chronicle';
 var PVP_DATA_VERSION=2;
-var CLIENT_BUILD_VERSION=46;
+var CLIENT_BUILD_VERSION=47;
 var PVP_DAILY_LIMIT=5;
 var PVP_SEASON_ID='preseason-1';
 var SUPABASE_URL='https://ybbolpaerkhozzxlsvag.supabase.co';
 var SUPABASE_PUBLISHABLE_KEY='sb_publishable_xJ2RGNNCbWGBB0kd2LO2Ag_LJuQw0VB';
 var APP_URL='https://sikkokuma0624-ui.github.io/ign-chronicle/';
+var FEEDBACK_URL='https://docs.google.com/forms/d/e/1FAIpQLScprbnp_kuFLwACaEhl5wj1583nHsMqIxV5AzDFrKJpYrvHKQ/viewform?usp=publish-editor';
 var cloudClient=null,cloudUser=null,cloudReady=false,cloudBusy=false,cloudTimer=null;
 var cloudStatus='接続準備中',cloudLastSavedAt=null,cloudRemoteSave=null,cloudRemoteChecked=false,cloudAuthListenerBound=false;
 var pvpOnlineProfiles=[],pvpOnlineLoading=false,pvpOnlineStatus='未取得';
@@ -2315,8 +2318,10 @@ var guide='<div class="card guide"><h3 style="margin-top:0;">遊び方</h3><div 
 '<div class="guide-step"><strong>④ Lv50で第二異能へ</strong><span class="small">覚醒クエストに勝つと第二異能を獲得。その異能をLv50まで育てると、二つの力を統合できる。</span></div>'+
 '<div class="guide-step"><strong>⑤ 統合異能・転生・隠し異能</strong><span class="small">統合後はLv100が目標。転生では一部スキルを持ち越して別の異能を選べる。隠し異能の条件は下の「未確認異能」で確認。</span></div>'+
 '<div class="small" style="margin-top:10px;color:#8fe3ff;">セーブは端末へ自動保存されます。メール連携後はクラウドセーブも利用できます。</div>'+
-'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;"><button onclick="openPrologue(0,false)">序章を読む</button><button onclick="startTutorial(0)">操作説明を見る</button></div></div>';
+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;"><button onclick="openPrologue(0,false)">序章を読む</button><button onclick="startTutorial(0)">操作説明を見る</button></div>'+
+'<a class="button-link feedback" style="margin-top:8px;" href="'+FEEDBACK_URL+'" target="_blank" rel="noopener noreferrer">不具合・ご意見を報告</a></div>';
 var updates='<div class="card"><h3 style="margin-top:0;">更新履歴</h3>'+
+'<div class="update-entry"><span class="update-tag">β Build 47</span><strong>不具合報告窓口を追加</strong><div class="small">開始画面と記録から、匿名の不具合・ご意見フォームを開けるように変更。</div></div>'+
 '<div class="update-entry"><span class="update-tag">β Build 46</span><strong>案内・物語を強化</strong><div class="small">ゲーム説明、3幕の序章、詳しい遊び方、更新履歴を追加。</div></div>'+
 '<div class="update-entry"><span class="update-tag">β Build 45</span><strong>公開向け表示を整理</strong><div class="small">共同討伐演習や購入準備中の案内を整備し、開発者向け表記を削除。</div></div>'+
 '<div class="update-entry"><span class="update-tag">β Build 44</span><strong>セーブ復旧を強化</strong><div class="small">端末データ・緊急バックアップ・クラウドから復元できる開始画面を追加。</div></div>'+
