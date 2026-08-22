@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="異能クロニクル">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
 <title>異能ゲート・クロニクル</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b0b10;color:#e8e6f0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;line-height:1.5}
@@ -154,7 +157,7 @@ var SAVE_KEY='ign_save_v1';
 var BACKUP_KEY='ign_save_backups_v1';
 var CLOUD_GAME_ID='inou_chronicle';
 var PVP_DATA_VERSION=2;
-var CLIENT_BUILD_VERSION=47;
+var CLIENT_BUILD_VERSION=48;
 var PVP_DAILY_LIMIT=5;
 var PVP_SEASON_ID='preseason-1';
 var SUPABASE_URL='https://ybbolpaerkhozzxlsvag.supabase.co';
@@ -2320,7 +2323,9 @@ var guide='<div class="card guide"><h3 style="margin-top:0;">遊び方</h3><div 
 '<div class="small" style="margin-top:10px;color:#8fe3ff;">セーブは端末へ自動保存されます。メール連携後はクラウドセーブも利用できます。</div>'+
 '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;"><button onclick="openPrologue(0,false)">序章を読む</button><button onclick="startTutorial(0)">操作説明を見る</button></div>'+
 '<a class="button-link feedback" style="margin-top:8px;" href="'+FEEDBACK_URL+'" target="_blank" rel="noopener noreferrer">不具合・ご意見を報告</a></div>';
+var pwa='<div class="card"><h3 style="margin-top:0;">ホーム画面アプリ</h3><div class="small">iPhoneはSafariの共有ボタンから「ホーム画面に追加」を選ぶと、全画面のアプリとして起動できます。初回にオンラインで開いた後は、通信できない時も端末セーブで基本プレイを続けられます。</div><div class="small" style="margin-top:8px;color:#ffd76b;">クラウド保存・アリーナ・共同討伐・不具合報告は通信が必要です。</div></div>';
 var updates='<div class="card"><h3 style="margin-top:0;">更新履歴</h3>'+
+'<div class="update-entry"><span class="update-tag">β Build 48</span><strong>ホーム画面アプリに対応</strong><div class="small">専用アイコン、全画面起動、基本画面のオフライン起動、更新時のキャッシュ切替に対応。</div></div>'+
 '<div class="update-entry"><span class="update-tag">β Build 47</span><strong>不具合報告窓口を追加</strong><div class="small">開始画面と記録から、匿名の不具合・ご意見フォームを開けるように変更。</div></div>'+
 '<div class="update-entry"><span class="update-tag">β Build 46</span><strong>案内・物語を強化</strong><div class="small">ゲーム説明、3幕の序章、詳しい遊び方、更新履歴を追加。</div></div>'+
 '<div class="update-entry"><span class="update-tag">β Build 45</span><strong>公開向け表示を整理</strong><div class="small">共同討伐演習や購入準備中の案内を整備し、開発者向け表記を削除。</div></div>'+
@@ -2344,7 +2349,7 @@ return '<div style="margin-bottom:12px;"><strong style="color:#ffd76b;">'+S.name
 return '<span class="chip '+(owned2?'chosen':'dim')+'">'+(owned2?p.name:'？？？')+'</span>';}).join('')+'</div>'+
 '<div class="small" style="margin-top:4px;color:'+(eq>=2?'#ffd76b':'#9a97b0')+'">2部位：'+S.bonus2.label+'</div>'+
 '<div class="small" style="color:'+(eq>=3?'#ffd76b':'#9a97b0')+'">3部位：'+S.bonus3.label+'</div></div>';}).join('')+'</div>';
-document.getElementById('recordContent').innerHTML=guide+story+hidden+updates+th+sets+'<div class="card"><h3 style="margin-top:0;">異能録</h3></div>'+ab+'<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">完全クリア済みゲート</h3></div>'+ch;}
+document.getElementById('recordContent').innerHTML=guide+pwa+story+hidden+updates+th+sets+'<div class="card"><h3 style="margin-top:0;">異能録</h3></div>'+ab+'<div class="card" style="margin-top:16px;"><h3 style="margin-top:0;">完全クリア済みゲート</h3></div>'+ch;}
 var awakeningPick=null;
 function openAwakening(){if(state.phase!=='first'||state.level<50)return;awakeningPick=null;renderAwakeningChoices();}
 function renderAwakeningChoices(){var rv=selectableAbilities().filter(function(a){return a.id!==state.baseAbility;});
@@ -2434,6 +2439,7 @@ mergeFlavor();
 renderStart();
 installArtPreviewEntry();
 cloudInit().then(function(){renderStartContinue();if(state){scheduleCloudSave();fetchPvpProfiles(false);fetchPvpHistory(false);fetchPvpDailyStatus(false);}});
+if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('./service-worker.js').then(function(reg){reg.update();}).catch(function(err){console.warn('Service Worker registration failed',err);});});}
 </script>
 </body>
 </html>

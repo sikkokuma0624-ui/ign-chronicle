@@ -1,0 +1,16 @@
+{
+  "name": "異能ゲート・クロニクル",
+  "short_name": "異能クロニクル",
+  "description": "異能を選び、ゲートを攻略して最強を目指すダークファンタジー育成RPG。",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0b10",
+  "theme_color": "#0b0b10",
+  "icons": [
+    {"src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
