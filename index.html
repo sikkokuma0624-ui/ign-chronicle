@@ -157,7 +157,7 @@ var SAVE_KEY='ign_save_v1';
 var BACKUP_KEY='ign_save_backups_v1';
 var CLOUD_GAME_ID='inou_chronicle';
 var PVP_DATA_VERSION=2;
-var CLIENT_BUILD_VERSION=48;
+var CLIENT_BUILD_VERSION=49;
 var PVP_DAILY_LIMIT=5;
 var PVP_SEASON_ID='preseason-1';
 var SUPABASE_URL='https://ybbolpaerkhozzxlsvag.supabase.co';
@@ -1006,10 +1006,14 @@ function restoreRecoveryBackup(){var b=latestRecoveryBackup();if(!b){showMessage
 function cloudSetStatus(v){cloudStatus=v;var el=document.getElementById('cloudStatusText');if(el)el.textContent=v;}
 function cloudIsAnonymous(){return!cloudUser||cloudUser.is_anonymous===true;}
 function cloudAccountText(){if(!cloudUser)return'未接続';if(cloudIsAnonymous())return'ゲスト利用中';return cloudUser.email?('連携済み：'+cloudEsc(cloudUser.email)):'メール連携済み';}
+var CLOUD_AUTH_STORAGE_KEY='ign-chronicle-auth-v1';
+function cloudHasAuthCallback(){return/(?:access_token|refresh_token|error_description)=/.test(location.hash)||/(?:^|[?&])code=/.test(location.search);}
+function cloudClearAuthCallbackUrl(){if(!cloudHasAuthCallback())return;try{history.replaceState({},document.title,APP_URL);}catch(e){}}
+function cloudSleep(ms){return new Promise(function(resolve){setTimeout(resolve,ms);});}
 function bindCloudAuthListener(){
  if(cloudAuthListenerBound||!cloudClient)return;cloudAuthListenerBound=true;
  cloudClient.auth.onAuthStateChange(function(event,session){
-  if(session&&session.user){cloudUser=session.user;cloudReady=true;cloudSetStatus('接続済み');setTimeout(function(){cloudFetchRemote(false);if(state)safe(renderStatus);},0);}
+  if(session&&session.user){cloudUser=session.user;cloudReady=true;cloudSetStatus('接続済み');if(!cloudIsAnonymous())cloudClearAuthCallbackUrl();setTimeout(function(){cloudFetchRemote(false);if(state)safe(renderStatus);},0);}
   else{cloudUser=null;cloudReady=false;cloudRemoteSave=null;cloudRemoteChecked=false;cloudSetStatus('ログアウト済み');}
  });
 }
@@ -1018,14 +1022,15 @@ async function cloudInit(){
  cloudBusy=true;cloudSetStatus('接続中…');
  try{
   if(!window.supabase||!window.supabase.createClient)throw new Error('通信ライブラリを読み込めませんでした');
-  cloudClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  cloudClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit',storage:window.localStorage,storageKey:CLOUD_AUTH_STORAGE_KEY}});
   bindCloudAuthListener();
+  if(cloudHasAuthCallback())await cloudSleep(700);
   var got=await cloudClient.auth.getSession();
   var session=got.data&&got.data.session;
   if(!session){var signed=await cloudClient.auth.signInAnonymously();if(signed.error)throw signed.error;session=signed.data.session;}
   cloudUser=session&&session.user;
   if(!cloudUser)throw new Error('匿名ログインに失敗しました');
-  cloudReady=true;cloudSetStatus('接続済み');
+  cloudReady=true;cloudSetStatus('接続済み');if(!cloudIsAnonymous())cloudClearAuthCallbackUrl();
   await cloudFetchRemote(false);
   return true;
  }catch(e){logError(e);cloudSetStatus('オフライン（端末内保存は有効）');return false;}
@@ -1098,7 +1103,7 @@ function renderStartContinue(){
  if(backup)h+='<button style="width:100%;margin-bottom:10px;border-color:#ffd76b;" onclick="restoreRecoveryBackup()">緊急バックアップから復元<br><span class="small">'+cloudTimeText(backup.savedAt)+'</span></button>';
  if(cloudRemoteSave&&cloudRemoteSave.save_data)h+='<button style="width:100%;margin-bottom:10px;border-color:#8f6bff;" onclick="cloudLoadFromStart()">クラウドから復元<br><span class="small">'+cloudTimeText(cloudRemoteSave.updated_at)+'</span></button>';
  h+='<div class="small" style="margin-bottom:14px;">クラウド：'+cloudStatus+'</div>';
- if(cloudIsAnonymous())h+='<div style="margin-top:14px;padding:16px;border:1px solid #30303f;border-radius:14px;background:#12121a;text-align:left;"><strong>登録済みの方・別端末から引き継ぐ</strong><div class="small" style="margin:6px 0 10px;">登録済みメールアドレスへログインリンクを送ります。メール内のリンクを押すとクラウドセーブを復元できます。</div><input id="startLoginEmail" type="email" autocomplete="email" placeholder="登録済みメールアドレス" style="width:100%;font-size:16px;padding:12px;border-radius:10px;border:1px solid #444;background:#0d0d13;color:#fff;margin:0 0 8px;"><button style="width:100%;" onclick="sendCloudLoginLink(\'startLoginEmail\')">ログインリンクを送る</button></div>';
+ if(cloudIsAnonymous())h+='<div style="margin-top:14px;padding:16px;border:1px solid #30303f;border-radius:14px;background:#12121a;text-align:left;"><strong>登録済みの方・別端末から引き継ぐ</strong><div class="small" style="margin:6px 0 10px;">登録済みメールアドレスへログインリンクを送ります。メール内のリンク、または6桁コードでサインインできます。</div><input id="startLoginEmail" type="email" autocomplete="email" placeholder="登録済みメールアドレス" style="width:100%;font-size:16px;padding:12px;border-radius:10px;border:1px solid #444;background:#0d0d13;color:#fff;margin:0 0 8px;"><button style="width:100%;" onclick="sendCloudLoginLink(\'startLoginEmail\')">ログインリンクを送る</button><input id="startLoginOtp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="メールの6桁コード" style="width:100%;font-size:16px;padding:12px;border-radius:10px;border:1px solid #444;background:#0d0d13;color:#fff;margin:8px 0;"><button class="primary" style="width:100%;" onclick="verifyCloudOtp(\'startLoginEmail\',\'startLoginOtp\')">6桁コードでサインイン</button></div>';
  else h+='<div class="small" style="margin:8px 0 14px;color:#8fe3ff;">メール連携済み。クラウドセーブを利用できます。</div>';
  a.innerHTML=h;
 }
@@ -1124,8 +1129,24 @@ async function sendCloudLoginLink(inputId){
  if(!cloudReady&&!(await cloudInit())){showMessage('接続失敗','Supabaseへ接続できませんでした。');return;}
  try{
   var res=await cloudClient.auth.signInWithOtp({email:email,options:{emailRedirectTo:APP_URL,shouldCreateUser:false}});if(res.error)throw res.error;
-  showMessage('ログインメールを送信しました','メール内のログインリンクを押してください。<br><br>ゲームへ戻るとクラウドデータを復元できます。');
+  showMessage('ログインメールを送信しました','メール内のログインリンクを押すか、記載された6桁コードをゲーム画面へ入力してください。<br><br>ゲームへ戻るとクラウドデータを復元できます。');
  }catch(e){logError(e);showMessage('送信失敗','未登録のメールアドレス、または送信回数の上限に達している可能性があります。');}
+}
+async function verifyCloudOtp(emailInputId,tokenInputId){
+ var email=accountInput(emailInputId||'loginEmail');
+ var token=accountInput(tokenInputId||'loginOtp').replace(/\D/g,'');
+ if(!validEmail(email)){showMessage('メールアドレスを確認','登録済みメールアドレスを入力してください。');return;}
+ if(token.length!==6){showMessage('6桁コードを確認','メールに届いた6桁の認証コードを入力してください。');return;}
+ try{
+  if(!cloudClient)await cloudInit();
+  cloudSetStatus('認証中…');
+  var res=await cloudClient.auth.verifyOtp({email:email,token:token,type:'email'});
+  if(res.error)throw res.error;
+  cloudUser=res.data&&res.data.user?res.data.user:(res.data&&res.data.session?res.data.session.user:null);
+  cloudReady=!!cloudUser;cloudClearAuthCallbackUrl();
+  if(cloudReady){await cloudFetchRemote(false);if(state)safe(renderStatus);}
+  showMessage('サインインしました','この端末では認証状態を保存します。次回から通常はメール認証不要です。');
+ }catch(e){logError(e);cloudSetStatus('認証失敗');showMessage('認証できませんでした','コードが違うか、有効期限が切れています。新しいメールを送って再度お試しください。');}
 }
 async function changeCloudEmail(){
  var email=accountInput('changeEmail');if(!validEmail(email)){showMessage('入力確認','新しいメールアドレスを正しく入力してください。');return;}
@@ -1996,7 +2017,7 @@ function renderAccountCardHtml(){
  var h='<div class="card"><h3 style="margin-top:0;">アカウント・引き継ぎ</h3><div class="small" style="color:#8fe3ff;">'+cloudAccountText()+'</div>';
  if(!cloudReady)return h+'<div class="small" style="margin-top:8px;">現在はオフラインです。端末内セーブは利用できます。</div></div>';
  if(!cloudIsAnonymous())return h+'<div class="small" style="margin-top:8px;">別のiPhoneやPCでは、下の「ログインリンクを送る」から同じメールアドレスでログインできます。</div><input id="loginEmail" type="email" autocomplete="email" placeholder="登録済みメールアドレス" style="'+inputStyle+'"><button style="width:100%;" onclick="sendCloudLoginLink()">ログインリンクを送る</button><hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;"><strong>メールアドレス変更</strong><input id="changeEmail" type="email" autocomplete="email" placeholder="新しいメールアドレス" style="'+inputStyle+'"><button style="width:100%;" onclick="changeCloudEmail()">変更確認メールを送る</button><hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;"><strong>ログアウト</strong><div class="small" style="margin:6px 0 8px;">ログアウト前にクラウド保存を確認します。</div><button style="width:100%;margin-bottom:8px;" onclick="logoutCloud(false)">ログアウト（端末データを残す）</button><button class="danger" style="width:100%;" onclick="logoutCloud(true)">ログアウトして端末データも削除</button><hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;"><strong style="color:#ff8ca1;">アカウント完全削除</strong><div class="small" style="margin:6px 0 8px;">クラウドセーブ・PVP防衛データ・戦績・端末データを削除します。取り消せません。</div><input id="deleteAccountConfirm" type="email" autocomplete="off" placeholder="現在のメールアドレスを入力" style="'+inputStyle+'"><button class="danger" style="width:100%;" onclick="deleteCloudAccount()">アカウントを完全に削除</button></div>';
- return h+'<div class="small" style="margin-top:8px;">現在のゲストデータをメールアドレスへ連携します。確認メール内のリンクを押すと登録完了です。</div><input id="linkEmail" type="email" autocomplete="email" placeholder="連携するメールアドレス" style="'+inputStyle+'"><button class="primary" style="width:100%;" onclick="linkCloudEmail()">このセーブをメール連携</button><hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;"><div class="small">すでに別端末で登録済みの場合</div><input id="loginEmail" type="email" autocomplete="email" placeholder="登録済みメールアドレス" style="'+inputStyle+'"><button style="width:100%;" onclick="sendCloudLoginLink()">ログインリンクを送る</button></div>';
+ return h+'<div class="small" style="margin-top:8px;">現在のゲストデータをメールアドレスへ連携します。確認メール内のリンクを押すと登録完了です。</div><input id="linkEmail" type="email" autocomplete="email" placeholder="連携するメールアドレス" style="'+inputStyle+'"><button class="primary" style="width:100%;" onclick="linkCloudEmail()">このセーブをメール連携</button><hr style="border:0;border-top:1px solid #2c2c3a;margin:16px 0;"><div class="small">すでに別端末で登録済みの場合</div><input id="loginEmail" type="email" autocomplete="email" placeholder="登録済みメールアドレス" style="'+inputStyle+'"><button style="width:100%;" onclick="sendCloudLoginLink()">ログインリンクを送る</button><input id="loginOtp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="メールの6桁コード" style="'+inputStyle+'"><button class="primary" style="width:100%;" onclick="verifyCloudOtp(\'loginEmail\',\'loginOtp\')">6桁コードでサインイン</button></div>';
 }
 function renderStatus(){var st=getStats();var a=state.alloc;
 var rows=[{key:'str',label:'腕力',note:'1pt 攻撃+2',val:a.str},{key:'vit',label:'耐久',note:'1pt 最大HP+12',val:a.vit},{key:'def',label:'防御',note:'1pt 防御+2',val:a.def},{key:'agi',label:'敏捷',note:'1pt 会心/回避/命中+0.5% 速度+1',val:a.agi},{key:'pow',label:'異能',note:'1pt 異能威力+2%',val:a.pow}];
@@ -2439,7 +2460,35 @@ mergeFlavor();
 renderStart();
 installArtPreviewEntry();
 cloudInit().then(function(){renderStartContinue();if(state){scheduleCloudSave();fetchPvpProfiles(false);fetchPvpHistory(false);fetchPvpDailyStatus(false);}});
-if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('./service-worker.js').then(function(reg){reg.update();}).catch(function(err){console.warn('Service Worker registration failed',err);});});}
+async function refreshPwaShell(){
+ var v=String(CLIENT_BUILD_VERSION);
+ try{
+  var previous=localStorage.getItem('ign-client-build');
+  if(previous!==v&&'caches' in window){
+   var keys=await caches.keys();
+   await Promise.all(keys.filter(function(k){return /ign|chronicle|gate/i.test(k);}).map(function(k){return caches.delete(k);}));
+   localStorage.setItem('ign-client-build',v);
+  }
+ }catch(e){}
+ try{
+  var reg=await navigator.serviceWorker.register('./service-worker.js?v='+encodeURIComponent(v));
+  await reg.update();
+  if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'});
+ }catch(e){console.warn('Service Worker registration failed',e);}
+}
+async function resumeCloudSession(){
+ try{
+  if(!cloudClient)await cloudInit();
+  var got=await cloudClient.auth.getSession();
+  if(got&&got.data&&got.data.session&&got.data.session.user){
+   cloudUser=got.data.session.user;cloudReady=true;cloudSetStatus('接続済み');
+   try{renderStatus();}catch(e){}
+  }
+ }catch(e){}
+}
+window.addEventListener('pageshow',resumeCloudSession);
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')resumeCloudSession();});
+if('serviceWorker' in navigator){window.addEventListener('load',refreshPwaShell);}
 </script>
 </body>
 </html>
