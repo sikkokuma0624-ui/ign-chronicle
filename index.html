@@ -146,7 +146,7 @@ noads:{id:'ign_noads_500',name:'広告削除パック',price:'￥500',type:'buyo
 pass:{id:'ign_pass_500_30days',name:'覚醒者パス（30日利用権）',price:'￥500',type:'fixed_30days',
  desc:'購入時から30日間、以下の特典が有効になります。自動更新・定期課金はありません。'}};
 var EXP_TUNING={needBase:50,needPerLevel:45,needQuad:3,levelCoef:3,mobMult:1.5,bossMult:2.8,dailyMult:1.2,worldMult:1.5,pvpMult:1.5,secondMult:0.22,integratedMult:0.5,rebirthMult:1.55};
-var ENEMY_TUNING={hpMult:6.1,atkMult:1.1,bossHp:2.4,tierBoss:{F:1.9,E:2.1,D:2.2},bossAtk:0.6,secondPm:3.8,secondAtkPm:1.3,integratedPm:5.5,integratedAtkPm:2.2,tierHp:{F:0.34,E:0.6,D:0.70,C:0.94,B:1.06,A:1.18,S:1.38,SS:1.50,SSS:1.62,EX:1.9},tierAtk:{F:1.15},bandMid:0.15,rankStep:0.18,rankAtkStep:0.34,rankTaper:0.45,tutorialMid:0.15,followSpan:12,followMin:0.55,followMax:0.7,rebirthScale:0.10,exHp:1.6,exAtk:1.38,telegraphMult:2.8,telegraphChance:0.30,telegraphCd:3,bossAtkLate:1.82,telegraphLate:0.40};
+var ENEMY_TUNING={hpMult:6.1,atkMult:1.1,bossHp:2.4,tierBoss:{F:1.9,E:2.1,D:2.2},bossAtk:0.6,secondPm:3.8,secondAtkPm:1.3,integratedPm:5.5,integratedAtkPm:2.2,tierHp:{F:0.34,E:0.6,D:0.70,C:0.94,B:1.06,A:1.18,S:1.38,SS:1.50,SSS:1.62,EX:1.9},tierAtk:{F:1.25,E:1.40,D:1.30},bandMid:0.15,rankStep:0.18,rankAtkStep:0.34,rankTaper:0.45,tutorialMid:0.15,followSpan:12,followMin:0.55,followMax:0.7,rebirthScale:0.10,exHp:1.6,exAtk:1.38,telegraphMult:2.8,telegraphChance:0.30,telegraphCd:3,bossAtkLate:1.82,telegraphLate:0.40};
 var ECONOMY={sellMult:0.55,goldPhase:{first:1.0,second:1.18,integrated:1.25}};
 var COST={mob:5,boss:10,rival:0,daily:15,world:20,pvp:0};
 var FRAG={perDup:3,cost:10,name:'遺物の欠片'};
@@ -2393,6 +2393,7 @@ var guide='<div class="card guide"><h3 style="margin-top:0;">遊び方</h3><div 
 '<a class="button-link feedback" style="margin-top:8px;" href="'+FEEDBACK_URL+'" target="_blank" rel="noopener noreferrer">不具合・ご意見を報告</a></div>';
 var pwa='<div class="card"><h3 style="margin-top:0;">ホーム画面アプリ</h3><div class="small">iPhoneはSafariの共有ボタンから「ホーム画面に追加」を選ぶと、全画面のアプリとして起動できます。初回にオンラインで開いた後は、通信できない時も端末セーブで基本プレイを続けられます。</div><div class="small" style="margin-top:8px;color:#ffd76b;">クラウド保存・アリーナ・共同討伐・不具合報告は通信が必要です。</div></div>';
 var updates='<div class="card"><h3 style="margin-top:0;">更新履歴</h3>'+
+       '<div class="update-entry"><span class="update-tag">β Build 51</span><strong>序盤の敵攻撃力を再調整</strong><div class="small">高い防御力と戦闘中回復で被害が消えないよう、F・E・D級の攻撃補正を強化。敵HPは変更していない。</div></div>'+ 
        '<div class="update-entry"><span class="update-tag">β Build 50</span><strong>探索テンポと序盤バランスを調整</strong><div class="small">敵を強化し、経験値を増加。スタミナ消費を半減し、戦闘後の「さらに進む」と10回連続探索を追加。</div></div>'+ 
        '<div class="update-entry"><span class="update-tag">β Build 49</span><strong>アリーナ送信を安定化</strong><div class="small">勝敗送信前に行動回数と戦闘値を補正し、通信再送時にも不正値を送らないよう改善。</div></div>'+ 
        '<div class="update-entry"><span class="update-tag">β Build 48</span><strong>ホーム画面アプリに対応</strong><div class="small">専用アイコン、全画面起動、基本画面のオフライン起動、更新時のキャッシュ切替に対応。</div></div>'+ 
