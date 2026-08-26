@@ -145,10 +145,10 @@ noads:{id:'ign_noads_500',name:'広告削除パック',price:'￥500',type:'buyo
  desc:'広告視聴が不要になります。デイリーの広告報酬は、ボタンを押すだけで受け取れるようになります（1日'+5+'回の回数制限はそのまま）。'},
 pass:{id:'ign_pass_500_30days',name:'覚醒者パス（30日利用権）',price:'￥500',type:'fixed_30days',
  desc:'購入時から30日間、以下の特典が有効になります。自動更新・定期課金はありません。'}};
-var EXP_TUNING={needBase:50,needPerLevel:45,needQuad:3,levelCoef:3,mobMult:1.0,bossMult:2.2,dailyMult:1.2,worldMult:1.5,pvpMult:1.5,secondMult:0.22,integratedMult:0.5,rebirthMult:1.55};
-var ENEMY_TUNING={hpMult:5.5,atkMult:0.8,bossHp:2.4,tierBoss:{F:1.9,E:2.1,D:2.2},bossAtk:0.6,secondPm:3.8,secondAtkPm:1.3,integratedPm:5.5,integratedAtkPm:2.2,tierHp:{F:0.34,E:0.6,D:0.70,C:0.94,B:1.06,A:1.18,S:1.38,SS:1.50,SSS:1.62,EX:1.9},tierAtk:{F:1.15},bandMid:0.15,rankStep:0.18,rankAtkStep:0.34,rankTaper:0.45,tutorialMid:0.15,followSpan:12,followMin:0.55,followMax:0.7,rebirthScale:0.10,exHp:1.6,exAtk:1.38,telegraphMult:2.8,telegraphChance:0.30,telegraphCd:3,bossAtkLate:1.82,telegraphLate:0.40};
+var EXP_TUNING={needBase:50,needPerLevel:45,needQuad:3,levelCoef:3,mobMult:1.5,bossMult:2.8,dailyMult:1.2,worldMult:1.5,pvpMult:1.5,secondMult:0.22,integratedMult:0.5,rebirthMult:1.55};
+var ENEMY_TUNING={hpMult:6.1,atkMult:1.1,bossHp:2.4,tierBoss:{F:1.9,E:2.1,D:2.2},bossAtk:0.6,secondPm:3.8,secondAtkPm:1.3,integratedPm:5.5,integratedAtkPm:2.2,tierHp:{F:0.34,E:0.6,D:0.70,C:0.94,B:1.06,A:1.18,S:1.38,SS:1.50,SSS:1.62,EX:1.9},tierAtk:{F:1.15},bandMid:0.15,rankStep:0.18,rankAtkStep:0.34,rankTaper:0.45,tutorialMid:0.15,followSpan:12,followMin:0.55,followMax:0.7,rebirthScale:0.10,exHp:1.6,exAtk:1.38,telegraphMult:2.8,telegraphChance:0.30,telegraphCd:3,bossAtkLate:1.82,telegraphLate:0.40};
 var ECONOMY={sellMult:0.55,goldPhase:{first:1.0,second:1.18,integrated:1.25}};
-var COST={mob:10,boss:20,rival:0,daily:30,world:40,pvp:0};
+var COST={mob:5,boss:10,rival:0,daily:15,world:20,pvp:0};
 var FRAG={perDup:3,cost:10,name:'遺物の欠片'};
 var ENHANCE={max:10,perPlus:0.08,baseCost:300,scale:1.55};
 var POTION={name:'治癒薬',price:120,healPct:40,desc:'最大HPの40%を回復する。戦闘中は1戦につき1個まで（行動を1回消費）。探索中は何個でも使える。'};
@@ -157,7 +157,8 @@ var SAVE_KEY='ign_save_v1';
 var BACKUP_KEY='ign_save_backups_v1';
 var CLOUD_GAME_ID='inou_chronicle';
 var PVP_DATA_VERSION=2;
-var CLIENT_BUILD_VERSION=48;
+/* PVPサーバー互換プロトコル。ゲーム表示ビルドとは分離して維持する。 */
+var CLIENT_BUILD_VERSION=49;
 var PVP_DAILY_LIMIT=5;
 var PVP_SEASON_ID='preseason-1';
 var SUPABASE_URL='https://ybbolpaerkhozzxlsvag.supabase.co';
@@ -969,7 +970,7 @@ function activeTitleName(){if(hasPass()&&state.activeTitle==='__pass')return IAP
 var t=titleById(state.activeTitle);return t?t.name:null;}
 function setTitle(id){state.activeTitle=(state.activeTitle===id)?null:id;renderAll();}
 var BOT_NAMES=['カケル','セイナ','イブキ','レン','ミオ','ユイト','アキ','ソラ','ナギ','レイ','タイガ','ハク'];
-var selectedAbility=null,state=null,currentTab='explore',autoTimer=null;
+var selectedAbility=null,state=null,currentTab='explore',autoTimer=null,exploreChainTimer=null;
 function pick(a){return a[Math.floor(Math.random()*a.length)];}
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function fmt(t){if(!t)return'';return t.replace(/\{player\}/g,state?state.name:'あなた').replace(/\{terrain\}/g,state&&state.battle?state.battle.terrain:'戦場').replace(/\{enemy\}/g,state&&state.battle?state.battle.enemy.name:'敵');}
@@ -1210,7 +1211,7 @@ s.inventory.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rari
 s.equipment.forEach(function(it){if(it&&rarityMap[it.rarity]!==undefined)it.rarity=rarityMap[it.rarity];});}
 if(oldVersion<33){s.inventory.concat(s.equipment).forEach(function(it){if(!it||it.reqLv==null)return;var cap=(REQ_BASE[it.rank]||1)+Math.floor((Number(it.rarity)||0)/3)+2;it.reqLv=Math.max(1,Math.min(Number(it.reqLv)||1,Math.min(100,cap)));});}
 s.dataVersion=39;
-s.currentGateIndex=clamp(s.currentGateIndex||0,0,GATES.length-1);s.pendingSkills=s.pendingSkills||[];s.battle=null;s.auto=false;s.debugGates=s.debugGates||false;
+s.currentGateIndex=clamp(s.currentGateIndex||0,0,GATES.length-1);s.pendingSkills=s.pendingSkills||[];s.battle=null;s.auto=false;s.exploreChain=null;s.debugGates=s.debugGates||false;
 s.stamina=s.stamina==null?100:s.stamina;s.staminaTs=s.staminaTs||serverTime();s.arenaPts=s.arenaPts||0;s.playerId=s.playerId||makeId();
 s.learned=s.learned||{first:[],second:[],integrated:[]};s.skillDone=s.skillDone||{first:[],second:[],integrated:[]};
 s.rebirth=s.rebirth||0;s.tut=Object.assign({battles:0,gotItem:false,guideDone:false},s.tut||{});s.integratedReading=s.integratedReading||'';s.frags=s.frags||{};s.carriedSkills=s.carriedSkills||[];s.abilityHistory=s.abilityHistory||[];s.titles=s.titles||[];s.activeTitle=s.activeTitle||null;s.gold=s.gold||0;s.potions=s.potions==null?CONFIG.START_POTIONS:s.potions;s.hpTs=s.hpTs||serverTime();s.iap=Object.assign({noAds:false,passUntil:0},s.iap||{});if(!s.iap.testPurchaseCleanupV1){s.iap.noAds=false;s.iap.passUntil=0;s.iap.testPurchaseCleanupV1=true;}s.unlockedHidden=s.unlockedHidden||[];[s.baseAbility,s.secondAbility].forEach(function(id){if(id&&isHidden(id)&&s.unlockedHidden.indexOf(id)<0)s.unlockedHidden.push(id);});s.hiddenNotices=s.hiddenNotices||[];s.storySeen=s.storySeen||{};s.storyNotices=s.storyNotices||[];s.totalWins=s.totalWins||0;migrateSkillIds(s);migrateAbilityMastery(s);migratePvpState(s);if(s.pvp.pendingResult&&s.pvp.pendingResult.payload)s.pvp.pendingResult.payload.action_count=Math.max(1,Math.min(300,Number(s.pvp.pendingResult.payload.action_count)||0));normalizeEquipmentTypes(s);resetDailyOn(s);syncEquipSlots(s);return s;}
@@ -1359,6 +1360,13 @@ async function reconcilePendingPvp(matchId,attackerWon){
 }
 async function sendPendingPvpResult(showResult){
  if(!state||pvpResultBusy)return false;migratePvpState(state);var pending=state.pvp.pendingResult;if(!pending||!pending.matchId)return true;
+ pending.payload=pending.payload||{};
+ pending.payload.action_count=Math.max(1,Math.min(300,Number(pending.payload.action_count)||0));
+ pending.payload.duration_ms=Math.max(0,Math.min(3600000,Number(pending.payload.duration_ms)||0));
+ pending.payload.attacker_start_hp=Math.max(1,Number(pending.payload.attacker_start_hp)||1);
+ pending.payload.defender_start_hp=Math.max(1,Number(pending.payload.defender_start_hp)||1);
+ pending.payload.attacker_end_hp=Math.max(0,Number(pending.payload.attacker_end_hp)||0);
+ pending.payload.defender_end_hp=Math.max(0,Number(pending.payload.defender_end_hp)||0);
  pvpResultBusy=true;state.pvp.lastResultText='結果を送信中…';saveGame();if(currentTab==='daily')renderDaily();var lastError=null;
  try{
   for(var attempt=0;attempt<3;attempt++){
@@ -1377,7 +1385,7 @@ async function sendPendingPvpResult(showResult){
 }
 async function submitPvpResult(attackerWon,battle){
  var matchId=battle&&battle.enemy&&battle.enemy.matchId;if(!matchId||pvpResultBusy)return false;migratePvpState(state);var audit=battle.pvpAudit||{};
- var payload={proof_token:String(battle.enemy.proofToken||''),client_version:CLIENT_BUILD_VERSION,action_count:Math.max(0,Number(audit.actions)||0),duration_ms:Math.max(0,Date.now()-(Number(audit.startedAt)||Date.now())),attacker_start_hp:Math.max(1,Number(audit.attackerStartHp)||1),defender_start_hp:Math.max(1,Number(audit.defenderStartHp)||1),attacker_end_hp:Math.max(0,Number(state.hp)||0),defender_end_hp:Math.max(0,Number(battle.enemy.hp)||0)};
+   var payload={proof_token:String(battle.enemy.proofToken||''),client_version:CLIENT_BUILD_VERSION,action_count:Math.max(1,Math.min(300,Number(audit.actions)||0)),duration_ms:Math.max(0,Math.min(3600000,Date.now()-(Number(audit.startedAt)||Date.now()))),attacker_start_hp:Math.max(1,Number(audit.attackerStartHp)||1),defender_start_hp:Math.max(1,Number(audit.defenderStartHp)||1),attacker_end_hp:Math.max(0,Number(state.hp)||0),defender_end_hp:Math.max(0,Number(battle.enemy.hp)||0)};
  state.pvp.activeMatchId=matchId;state.pvp.pendingResult={matchId:matchId,attackerWon:!!attackerWon,payload:payload,savedAt:new Date().toISOString()};saveGame();return sendPendingPvpResult(true);
 }
 function renderStart(){document.getElementById('abilityList').innerHTML=ABILITIES.filter(function(ab){return!isHidden(ab.id);}).map(function(ab){var d=A_DATA[ab.id];
@@ -1518,8 +1526,8 @@ function sssClears(){var g=sssGate();if(!g)return 0;var p=state.gateProgress[g.n
 function gateUnlocked(g){
 if(g.ex)return state.debugGates||((state.rebirth||0)>=g.reqRebirth&&sssClears()>=g.reqClears);
 return state.debugGates||rankIndex(state.rank)>=rankIndex(g.rank);}
-function gateCost(g){return g.cost||COST.mob;}
-function gateBossCost(g){return g.ex?Math.min(100,g.cost*2):COST.boss;}
+function gateCost(g){return g.ex?Math.ceil(g.cost/2):COST.mob;}
+function gateBossCost(g){return g.ex?Math.ceil(g.cost):COST.boss;}
 function exLockText(g){
 var need=[];
 if((state.rebirth||0)<g.reqRebirth)need.push('転生'+g.reqRebirth+'回以上（現在 '+(state.rebirth||0)+'回）');
@@ -1541,7 +1549,8 @@ document.getElementById('exploreContent').innerHTML=
 '<div class="small" style="margin-top:8px;">'+(prog.cleared?'ゲート完全クリア済み。ボス再戦と通常敵の周回が可能。':(bossAvail?'ボス出現済み。勝てない場合は通常敵を周回してさらに育成できる。':'あと'+(gate.target-prog.kills)+'体討伐でボス出現。'))+'</div>'+
 '<div class="small" style="margin-top:8px;color:#9a97b0;">HPは5分ごとに最大値の1%だけ自然回復する。急ぐなら'+POTION.name+'を使うこと。</div>'+
 '<button style="margin-top:8px;width:100%;" onclick="usePotionField()" '+((!state.potions||state.hp>=getStats().hp)?'disabled':'')+'>'+POTION.name+'を使う（'+(state.potions||0)+'個／+'+potionHeal()+'）</button></div>'+
-'<div class="action-bar"><button onclick="startBattle(\'mob\')" '+(inBattle?'disabled':'')+'>モンスター('+gateCost(gate)+')</button>'+
+'<div class="action-bar"><button onclick="startBattle(\'mob\')" '+(inBattle?'disabled':'')+'>1回探索('+gateCost(gate)+')</button>'+
+'<button onclick="startExploreChain(10)" '+(inBattle||state.stamina<gateCost(gate)?'disabled':'')+'>10回連続探索（最大'+(gateCost(gate)*10)+'）</button>'+
 '<button onclick="startBattle(\'boss\')" '+((!bossAvail||inBattle)?'disabled':'')+'>'+(prog.cleared?'ボス再戦':'ボス挑戦')+'('+gateBossCost(gate)+')</button>'+aw+'</div>'+
 (function(){var nx=null;GATES.forEach(function(g){if(nx||g.ex||gateUnlocked(g))return;nx=g;});
 var ms=MILESTONES[state.phase],nextSkill=null;
@@ -1631,6 +1640,45 @@ async function startPvp(targetUserId){
   startBattle('pvp');
  }finally{pvpMatchBusy=false;}
 }
+function startExploreChain(count){
+if(!state||state.battle&&!state.battle.over)return;
+var cost=gateCost(getCurrentGate());
+if(state.stamina<cost){showMessage('スタミナ不足','探索にはスタミナ'+cost+'必要です。');return;}
+state.exploreChain={remaining:Math.max(1,Math.min(10,Number(count)||1)),total:Math.max(1,Math.min(10,Number(count)||1))};
+startBattle('mob');
+if(state.battle&&!state.battle.over){state.auto=true;startAuto();renderBattle();}
+}
+function stopExploreChain(reason){
+if(exploreChainTimer){clearTimeout(exploreChainTimer);exploreChainTimer=null;}
+var done=state&&state.exploreChain?state.exploreChain.total-state.exploreChain.remaining:0;
+if(state)state.exploreChain=null;
+if(reason)showMessage('連続探索を終了','完了：'+done+'回<br>'+reason);
+}
+function finishExploreChain(reason){
+var done=state&&state.exploreChain?state.exploreChain.total-state.exploreChain.remaining:0;
+stopExploreChain();closeBattle();state.auto=false;stopAuto();switchTab('explore');renderAll();
+showMessage('連続探索を終了','完了：'+done+'回<br>'+reason);
+}
+function continueExplore(){
+if(!state||!state.battle||!state.battle.over)return;
+var wasMob=state.battle.type==='mob';
+closeBattle();switchTab('explore');
+if(wasMob)startBattle('mob');else renderAll();
+}
+function scheduleExploreChain(){
+if(!state||!state.exploreChain)return;
+state.exploreChain.remaining--;
+if(state.exploreChain.remaining<=0){finishExploreChain('予定した探索を完了しました。');return;}
+if(state.pendingSkills.length||modalOpen()){finishExploreChain('スキル習得またはイベントが発生したため停止しました。');return;}
+var cost=gateCost(getCurrentGate());
+if(state.stamina<cost){finishExploreChain('スタミナが不足したため停止しました。');return;}
+exploreChainTimer=setTimeout(function(){
+exploreChainTimer=null;
+if(!state||!state.battle||!state.battle.over)return;
+closeBattle();startBattle('mob');
+if(state.battle&&!state.battle.over){state.auto=true;startAuto();renderBattle();}
+},650);
+}
 function startBattle(type,rivalId){if(!state)return;if(state.pendingSkills.length){processPendingSkills();return;}
 if(state.battle&&!state.battle.over){switchTab('battle');return;}
 var cost=COST[type]||0;
@@ -1694,7 +1742,11 @@ ei.innerHTML='<div class="card"><h3 style="margin:0 0 8px;">'+e.name+'</h3>'+
 '<div class="small" style="margin-top:8px;">敵状態：'+(eStat||'なし')+'</div>'+
 '<div class="small">自状態：'+(pStat||'なし')+(b.nullGuard?' / 無効化待機':'')+(b.sureDodge?' / 予知回避':'')+(b.reflect?' / 反射':'')+(b.firstStrike?' / 先制':'')+'</div>'+
 (b.telegraph?'<div class="card" style="margin:10px 0 0;border-color:#ff4d6d;background:#2a0f16;"><strong style="color:#ff9c9c;">【予兆】次のターン「'+b.telegraph.n+'」</strong><div class="small" style="margin-top:4px;">通常の'+ENEMY_TUNING.telegraphMult+'倍の一撃。防御で35%まで軽減、無効化・スタン・確定回避なら完全に防げる。</div></div>':'')+'</div>';
-if(b.over){ac.innerHTML='<button class="primary wide" onclick="endBattle()">帰還する</button>';return;}
+if(b.over){
+var chain=state.exploreChain&&b.type==='mob';
+var remain=chain?Math.max(0,state.exploreChain.remaining-1):0;
+ac.innerHTML=chain?'<div class="card"><strong>10回連続探索中</strong><div class="small">残り '+remain+' 回。敗北・スタミナ不足・スキル習得で自動停止します。</div></div><button class="danger wide" onclick="stopExploreChain(\'プレイヤー操作で中止しました。\');endBattle()">連続探索を中止して帰還</button>':(b.type==='mob'?'<div class="action-bar"><button class="primary" onclick="continueExplore()">さらに進む</button><button onclick="endBattle()">帰還する</button></div>':'<button class="primary wide" onclick="endBattle()">帰還する</button>');
+return;}
 var abName=state.phase==='integrated'?(state.integratedName||'統合異能'):(getAbilityById(getCurrentAbilityId())||{}).name;
 var btns='<div class="action-bar">'+
 '<button class="wide '+(state.auto?'primary':'')+'" onclick="toggleAuto()">オートバトル：'+(state.auto?'ON（この戦闘のみ）':'OFF')+'</button>'+
@@ -1977,15 +2029,16 @@ if(state.world.hp<=0&&!state.world.rewarded){state.world.rewarded=true;var it3=m
 if(enemy.type==='pvp'){state.arenaPts+=30;m.pvp++;addLog('アリーナ勝利！ Pt +30','system',true);addLog('PVPでは経験値・ゴールド・通常装備は獲得しない。シーズン報酬へ集約される。','system');if(enemy.online&&enemy.matchId){addLog('サーバーへ勝敗を送信している……','system');submitPvpResult(true,b);}}
 if(enemy.type==='rival')absorbAbility(enemy.rivalId);
 if(!isPvp)state.totalWins=(state.totalWins||0)+1;
-if(exp>0)gainExp(exp);state.hp=Math.min(getStats().hp,state.hp+Math.floor(getStats().hp*0.12));renderAll();}
+if(exp>0)gainExp(exp);state.hp=Math.min(getStats().hp,state.hp+Math.floor(getStats().hp*0.12));renderAll();if(enemy.type==='mob'&&state.exploreChain)scheduleExploreChain();}
 function defeat(){var b=state.battle;if(!b||b.over)return;b.over=true;state.auto=false;stopAuto();
+if(state.exploreChain)stopExploreChain('戦闘に敗北したため停止しました。');
 if(b.type==='pvp'){state.arenaPts+=5;addLog('アリーナ敗北……Pt +5','system');if(b.enemy.online&&b.enemy.matchId){addLog('サーバーへ勝敗を送信している……','system');submitPvpResult(false,b);}}
 addLog('視界が赤く染まる……だが、ステータスウィンドウが再構成を促している。','important',true);
 var lost=b.type==='pvp'?0:Math.floor(state.gold*CONFIG.DEFEAT_GOLD_LOSS);
 if(lost>0){state.gold-=lost;addLog('倒れている間に、所持金の一部（'+lost+'G）を失った。','enemy');}
 addLog('ゲートの外へ弾き出された。傷は塞がったが、スタミナと時間は戻らない。','system');renderBattle();}
 function closeBattle(){state.auto=false;stopAuto();if(state.hp<=0)state.hp=Math.max(1,Math.floor(getStats().hp*CONFIG.DEFEAT_HP_PCT));state.battle=null;}
-function endBattle(){closeBattle();state.auto=false;stopAuto();switchTab('explore');renderAll();}
+function endBattle(){if(state.exploreChain)stopExploreChain();closeBattle();state.auto=false;stopAuto();switchTab('explore');renderAll();}
 function gainExp(a){if(!state)return;var oldLv=state.level,m=1;
 if(state.phase==='second')m*=EXP_TUNING.secondMult;if(state.phase==='integrated')m*=EXP_TUNING.integratedMult;m*=Math.pow(EXP_TUNING.rebirthMult,state.rebirth||0);
 a=Math.floor(a*m);state.exp+=a;
@@ -2340,7 +2393,9 @@ var guide='<div class="card guide"><h3 style="margin-top:0;">遊び方</h3><div 
 '<a class="button-link feedback" style="margin-top:8px;" href="'+FEEDBACK_URL+'" target="_blank" rel="noopener noreferrer">不具合・ご意見を報告</a></div>';
 var pwa='<div class="card"><h3 style="margin-top:0;">ホーム画面アプリ</h3><div class="small">iPhoneはSafariの共有ボタンから「ホーム画面に追加」を選ぶと、全画面のアプリとして起動できます。初回にオンラインで開いた後は、通信できない時も端末セーブで基本プレイを続けられます。</div><div class="small" style="margin-top:8px;color:#ffd76b;">クラウド保存・アリーナ・共同討伐・不具合報告は通信が必要です。</div></div>';
 var updates='<div class="card"><h3 style="margin-top:0;">更新履歴</h3>'+
-'<div class="update-entry"><span class="update-tag">β Build 48</span><strong>ホーム画面アプリに対応</strong><div class="small">専用アイコン、全画面起動、基本画面のオフライン起動、更新時のキャッシュ切替に対応。</div></div>'+
+       '<div class="update-entry"><span class="update-tag">β Build 50</span><strong>探索テンポと序盤バランスを調整</strong><div class="small">敵を強化し、経験値を増加。スタミナ消費を半減し、戦闘後の「さらに進む」と10回連続探索を追加。</div></div>'+ 
+       '<div class="update-entry"><span class="update-tag">β Build 49</span><strong>アリーナ送信を安定化</strong><div class="small">勝敗送信前に行動回数と戦闘値を補正し、通信再送時にも不正値を送らないよう改善。</div></div>'+ 
+       '<div class="update-entry"><span class="update-tag">β Build 48</span><strong>ホーム画面アプリに対応</strong><div class="small">専用アイコン、全画面起動、基本画面のオフライン起動、更新時のキャッシュ切替に対応。</div></div>'+ 
 '<div class="update-entry"><span class="update-tag">β Build 47</span><strong>不具合報告窓口を追加</strong><div class="small">開始画面と記録から、匿名の不具合・ご意見フォームを開けるように変更。</div></div>'+
 '<div class="update-entry"><span class="update-tag">β Build 46</span><strong>案内・物語を強化</strong><div class="small">ゲーム説明、3幕の序章、詳しい遊び方、更新履歴を追加。</div></div>'+
 '<div class="update-entry"><span class="update-tag">β Build 45</span><strong>公開向け表示を整理</strong><div class="small">共同討伐演習や購入準備中の案内を整備し、開発者向け表記を削除。</div></div>'+
